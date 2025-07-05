@@ -1,0 +1,49 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Shell history and temp files
+*.swp
+*.swo
+*~
+*.tmp
+
+# Log files
+*.log
+
+# VSCode/Cursor/IDE
+.vscode/
+.cursor/
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Node/npm
+node_modules/
+
+# Project-specific
+claude-auto-resume.log
+*.bak
+
+# Git
+.git/
+
+# Other
+.env
+.env.*
+
+# Ignore backup and temp files
+*.bak
+*.tmp
+*.old
+
+# Ignore gemini, bmad-core, claude, etc. (if not tracked)
+.gemini/
+.bmad-core/
+.claude/ 
