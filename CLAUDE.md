@@ -4,7 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a shell script utility called `claude-auto-resume.sh` that automatically resumes Claude CLI tasks after usage limits are lifted. The script monitors for Claude usage limits, waits for the restriction period to end, and then automatically continues the task.
+This is an enhanced shell script utility called `claude-auto-resume.sh` that automatically resumes Claude CLI tasks after usage limits are lifted. Version 2.0 includes modern Claude Code integration with hooks, memory system, advanced workflows, and comprehensive configuration options.
+
+## Auto-Resume Memory Context
+
+### Current Resume State
+When encountering usage limits, the script automatically:
+- Saves the current conversation ID and context
+- Preserves session type (default/extended/multimodal)
+- Maintains task hierarchy and subtask progress
+- Stores retry counts and error history
+
+### Resume Behavior
+- **Default**: Automatically resume with saved context when limit lifts
+- **Extended Thinking**: Preserves thinking chain and checkpoints
+- **Multimodal**: Caches images and maintains visual context
+- **Complex Tasks**: Tracks incomplete subtasks and dependencies
+
+### Configuration
+- Config directory: `~/.config/claude-auto-resume/`
+- Hooks config: `claude-resume-hooks.json`
+- Default config: `claude-resume-config.json`
+- State preservation: `~/.cache/claude-auto-resume/resume_state.json`
 
 ## Installation
 

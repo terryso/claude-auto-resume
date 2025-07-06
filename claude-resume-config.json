@@ -1,0 +1,150 @@
+{
+  "version": "1.0.0",
+  "description": "Claude Auto-Resume Default Configuration",
+  "general": {
+    "default_prompt": "continue",
+    "session_type": "default",
+    "auto_resume": true,
+    "extended_thinking": false,
+    "preserve_multimodal": true,
+    "conversation_picker": true
+  },
+  "limits": {
+    "max_retries": 3,
+    "retry_delay": 10,
+    "wait_buffer": 10,
+    "check_interval": 60,
+    "warning_threshold": 80
+  },
+  "notifications": {
+    "enabled": true,
+    "method": "auto",
+    "sound": true,
+    "urgency_levels": {
+      "warning": "normal",
+      "limit_reached": "critical",
+      "resume_ready": "critical",
+      "error": "critical"
+    },
+    "periodic_updates": true,
+    "update_interval": 300
+  },
+  "logging": {
+    "log_level": "info",
+    "log_file": "auto",
+    "max_log_size": "10M",
+    "log_rotation": 5,
+    "debug_mode": false,
+    "verbose": false
+  },
+  "ui": {
+    "colors": true,
+    "progress_bar": true,
+    "countdown_format": "detailed",
+    "quiet_mode": false,
+    "clear_screen": false,
+    "unicode_symbols": true
+  },
+  "paths": {
+    "config_dir": "~/.config/claude-auto-resume",
+    "data_dir": "~/.local/share/claude-auto-resume",
+    "cache_dir": "~/.cache/claude-auto-resume",
+    "log_dir": "auto"
+  },
+  "hooks": {
+    "enabled": true,
+    "config_file": "hooks.json",
+    "custom_hooks_dir": "~/.config/claude-auto-resume/hooks.d",
+    "pre_resume": [],
+    "post_resume": [],
+    "on_error": []
+  },
+  "memory": {
+    "enabled": true,
+    "persist_state": true,
+    "state_file": "resume_state.json",
+    "context_preservation": {
+      "enabled": true,
+      "include_outputs": true,
+      "max_context_size": "100K"
+    },
+    "claude_md_integration": true
+  },
+  "advanced": {
+    "error_patterns": {
+      "usage_limit": [
+        "usage limit reached",
+        "Claude AI usage limit reached",
+        "limit has been reached"
+      ],
+      "rate_limit": [
+        "rate limit exceeded",
+        "too many requests",
+        "please retry after"
+      ],
+      "token_limit": [
+        "token limit",
+        "context length exceeded",
+        "maximum tokens"
+      ]
+    },
+    "resume_strategies": {
+      "usage_limit": "wait_and_retry",
+      "rate_limit": "exponential_backoff",
+      "token_limit": "truncate_context",
+      "unknown": "prompt_user"
+    },
+    "performance": {
+      "parallel_checks": true,
+      "cache_ttl": 900,
+      "state_compression": true
+    }
+  },
+  "workflows": {
+    "extended_thinking": {
+      "preserve_chain": true,
+      "checkpoint_interval": 300,
+      "auto_save": true
+    },
+    "multimodal": {
+      "preserve_images": true,
+      "image_cache": true,
+      "max_image_size": "10M"
+    },
+    "complex_tasks": {
+      "task_tracking": true,
+      "subtask_preservation": true,
+      "hierarchy_depth": 5
+    }
+  },
+  "integration": {
+    "ci_cd": {
+      "enabled": false,
+      "fail_on_limit": false,
+      "wait_timeout": 3600
+    },
+    "ide": {
+      "vscode": true,
+      "vim": true,
+      "emacs": false
+    },
+    "git": {
+      "auto_commit": false,
+      "commit_message": "Auto-save before Claude limit",
+      "branch_prefix": "claude-auto-save"
+    }
+  },
+  "presets": {
+    "description": "Predefined configurations for common use cases",
+    "available": [
+      "default",
+      "minimal",
+      "ci_cd",
+      "development",
+      "production",
+      "quiet",
+      "verbose"
+    ],
+    "current": "default"
+  }
+}

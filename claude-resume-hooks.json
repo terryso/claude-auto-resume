@@ -1,0 +1,177 @@
+{
+  "version": "1.0.0",
+  "description": "Claude Code Auto-Resume Hooks Configuration",
+  "hooks": {
+    "PreToolUse": {
+      "enabled": true,
+      "commands": [
+        {
+          "name": "check_usage_limit",
+          "command": "claude-auto-resume --check-only",
+          "description": "Check if usage limit is approaching before tool use",
+          "conditions": {
+            "tools": ["*"],
+            "skipFor": ["Read", "LS", "Grep"]
+          }
+        }
+      ]
+    },
+    "PostToolUse": {
+      "enabled": true,
+      "commands": [
+        {
+          "name": "save_context",
+          "command": "claude-auto-resume --save-context",
+          "description": "Save current context after significant tool use",
+          "conditions": {
+            "tools": ["Write", "Edit", "MultiEdit", "NotebookEdit"],
+            "onError": false
+          }
+        }
+      ]
+    },
+    "Stop": {
+      "enabled": true,
+      "commands": [
+        {
+          "name": "auto_resume_handler",
+          "command": "claude-auto-resume --handle-stop",
+          "description": "Automatically handle usage limit stops and schedule resume",
+          "conditions": {
+            "errorTypes": ["usage_limit", "rate_limit"],
+            "autoSchedule": true
+          }
+        },
+        {
+          "name": "save_session_state",
+          "command": "claude-auto-resume --save-session",
+          "description": "Save complete session state for resume",
+          "conditions": {
+            "always": true
+          }
+        }
+      ]
+    },
+    "SubagentStop": {
+      "enabled": true,
+      "commands": [
+        {
+          "name": "subagent_state_handler",
+          "command": "claude-auto-resume --handle-subagent-stop",
+          "description": "Handle subagent stops and preserve task hierarchy",
+          "conditions": {
+            "preserveHierarchy": true
+          }
+        }
+      ]
+    },
+    "Notification": {
+      "enabled": true,
+      "commands": [
+        {
+          "name": "usage_warning",
+          "command": "claude-auto-resume --notify-warning",
+          "description": "Notify when approaching usage limits",
+          "conditions": {
+            "thresholds": {
+              "usage": 80,
+              "tokens": 90
+            }
+          }
+        },
+        {
+          "name": "resume_ready",
+          "command": "claude-auto-resume --notify-resume",
+          "description": "Notify when ready to resume after limit",
+          "conditions": {
+            "immediate": true
+          }
+        }
+      ]
+    },
+    "Error": {
+      "enabled": true,
+      "commands": [
+        {
+          "name": "error_recovery",
+          "command": "claude-auto-resume --handle-error",
+          "description": "Handle and recover from various errors",
+          "conditions": {
+            "retryable": true,
+            "maxRetries": 3
+          }
+        }
+      ]
+    },
+    "SessionStart": {
+      "enabled": true,
+      "commands": [
+        {
+          "name": "load_previous_state",
+          "command": "claude-auto-resume --load-state",
+          "description": "Load previous session state if resuming",
+          "conditions": {
+            "checkForIncomplete": true
+          }
+        }
+      ]
+    },
+    "SessionEnd": {
+      "enabled": true,
+      "commands": [
+        {
+          "name": "cleanup_state",
+          "command": "claude-auto-resume --cleanup",
+          "description": "Clean up temporary state files",
+          "conditions": {
+            "preserveDays": 7
+          }
+        }
+      ]
+    }
+  },
+  "globalSettings": {
+    "logLevel": "info",
+    "timeout": 30,
+    "retryOnFailure": true,
+    "notificationMethod": "auto",
+    "preserveContext": true,
+    "autoResumeEnabled": true,
+    "hookExecutionOrder": "parallel",
+    "errorHandling": "continue"
+  },
+  "customHooks": {
+    "description": "User-defined hooks can be added here",
+    "examples": [
+      {
+        "name": "custom_backup",
+        "trigger": "PostToolUse",
+        "command": "git add -A && git commit -m 'Auto-backup before limit'",
+        "enabled": false
+      }
+    ]
+  },
+  "integration": {
+    "claudeCode": {
+      "minVersion": "2.0.0",
+      "features": [
+        "hooks",
+        "memory",
+        "extended-thinking",
+        "multimodal"
+      ]
+    },
+    "environment": {
+      "requiredCommands": [
+        "claude",
+        "jq",
+        "git"
+      ],
+      "optionalCommands": [
+        "notify-send",
+        "osascript",
+        "terminal-notifier"
+      ]
+    }
+  }
+}
