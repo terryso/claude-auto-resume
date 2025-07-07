@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a shell script utility called `claude-auto-resume.sh` that automatically resumes Claude CLI tasks after usage limits are lifted. The script monitors for Claude usage limits, waits for the restriction period to end, and then automatically continues the task.
 
+**⚠️ SECURITY NOTE**: This script uses `--dangerously-skip-permissions` flag, which bypasses all safety prompts and allows Claude to execute commands automatically without user confirmation. Use only in trusted environments.
+
 ## Installation
 
 ### Method 1: Using Makefile (Recommended)

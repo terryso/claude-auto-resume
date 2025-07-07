@@ -2,6 +2,21 @@
 
 A shell script utility that automatically resumes Claude CLI tasks when usage limits are lifted. It detects Claude usage restrictions, waits intelligently, and resumes task execution automatically.
 
+## ⚠️ SECURITY WARNING
+
+**This script uses `--dangerously-skip-permissions` flag when executing Claude commands**, which means:
+
+- **Claude Code will execute tasks WITHOUT asking for permission**
+- **File operations, system commands, and code changes will run automatically**
+- **Use ONLY in trusted environments and with trusted prompts**
+- **Review your prompt carefully before running this script**
+
+**Recommended Usage:**
+- Use in isolated development environments
+- Avoid on production systems or with sensitive data
+- Be specific with your prompts to limit scope of actions
+- Consider the potential impact of automated execution
+
 ## Use Cases
 
 This script is particularly useful when using Claude Code for development in the following scenarios:
@@ -132,6 +147,22 @@ claude-auto-resume -c -p "resume work"       # Continue with flag
 
 - **Claude CLI**: Must be installed and available in PATH
 - **Standard Unix Tools**: `grep`, `date`, `sleep`, `awk` (usually pre-installed)
+
+## Security Considerations
+
+### Permission Bypass
+This script uses `--dangerously-skip-permissions` to enable unattended operation. This means:
+
+1. **No interactive prompts**: Claude will not ask for confirmation before executing commands
+2. **Automatic execution**: File changes, system commands, and other operations run without user approval
+3. **Trust requirement**: You must trust both the script and the prompt you provide
+
+### Best Practices
+- **Environment isolation**: Use only in development/testing environments
+- **Prompt review**: Carefully craft prompts to limit scope (e.g., "continue implementing the login function in src/auth.js")
+- **Backup your work**: Ensure you have version control or backups before running
+- **Monitor execution**: Check the output to understand what actions were taken
+- **Limit scope**: Use specific prompts rather than open-ended ones
 
 ## Error Handling
 

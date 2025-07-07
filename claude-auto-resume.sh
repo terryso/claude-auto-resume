@@ -11,7 +11,7 @@ USE_CONTINUE_FLAG=false
 # Function to show help
 show_help() {
     cat << EOF
-Usage: $0 [OPTIONS] [PROMPT]
+Usage: claude-auto-resume [OPTIONS] [PROMPT]
 
 Automatically resume Claude CLI tasks after usage limits are lifted.
 
@@ -24,11 +24,16 @@ ARGUMENTS:
     PROMPT               Custom prompt to use when resuming (alternative to -p)
 
 EXAMPLES:
-    $0                                    # Start new session with "continue"
-    $0 "implement user authentication"    # Start new session with custom prompt
-    $0 -p "write unit tests"             # Start new session with -p flag
-    $0 -c "please continue the task"     # Continue previous conversation
-    $0 -c -p "resume where we left off"  # Continue previous conversation with -p flag
+    claude-auto-resume                                    # Start new session with "continue"
+    claude-auto-resume "implement user authentication"    # Start new session with custom prompt
+    claude-auto-resume -p "write unit tests"             # Start new session with -p flag
+    claude-auto-resume -c "please continue the task"     # Continue previous conversation
+    claude-auto-resume -c -p "resume where we left off"  # Continue previous conversation with -p flag
+
+SECURITY WARNING:
+    ⚠️  This script uses --dangerously-skip-permissions which bypasses all safety prompts.
+    ⚠️  Claude will execute commands automatically without asking for permission.
+    ⚠️  Use only in trusted environments with carefully crafted prompts.
 
 NOTES:
     - By default, starts a new session (uses claude without -c)
