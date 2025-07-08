@@ -8,6 +8,23 @@ DEFAULT_PROMPT="continue"
 # Default is to start new session (no -c flag)
 USE_CONTINUE_FLAG=false
 
+# Function to validate Claude CLI environment
+validate_claude_cli() {
+    # Check if Claude CLI is installed and accessible
+    if ! command -v claude &> /dev/null; then
+        echo "[ERROR] Claude CLI not found. Please install Claude CLI first."
+        echo "Visit https://claude.ai/code for installation instructions."
+        exit 1
+    fi
+    
+    # Check if --dangerously-skip-permissions flag is supported
+    if ! claude --help | grep -q "dangerously-skip-permissions"; then
+        echo "[WARNING] Your Claude CLI version may not support --dangerously-skip-permissions flag."
+        echo "This script requires a recent version of Claude CLI. Please consider updating."
+        echo "The script will continue but may fail during execution."
+    fi
+}
+
 # Function to show help
 show_help() {
     cat << EOF
@@ -72,6 +89,9 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Validate Claude CLI environment before proceeding
+validate_claude_cli
 
 # 1. Run the claude CLI command (replace with actual command as needed)
 CLAUDE_OUTPUT=$(claude -p 'check' 2>&1)
