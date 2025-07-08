@@ -198,6 +198,14 @@ claude-auto-resume/
 └── README.md               # Project description
 ```
 
+## Roadmap
+
+See our [Development Roadmap](docs/ROADMAP.md) for planned features and improvements, including:
+
+- **Phase 1**: Core stability improvements (environment validation, error handling)
+- **Phase 2**: Feature extensions (custom command execution, configuration options)
+- **Phase 3**: User experience optimization (enhanced help, better time display)
+
 ## Contributing
 
 1. Fork this repository
@@ -205,6 +213,8 @@ claude-auto-resume/
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Create a Pull Request
+
+Before contributing new features, please check our [roadmap](docs/ROADMAP.md) to ensure alignment with project goals.
 
 ## License
 
