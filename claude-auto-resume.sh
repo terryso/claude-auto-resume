@@ -14,6 +14,10 @@ USE_CONTINUE_FLAG=false
 # Cleanup function for graceful termination
 cleanup_on_exit() {
     local exit_code=$?
+    
+    # Always perform cleanup, regardless of exit code
+    cleanup_resources
+    
     if [ $exit_code -ne 0 ]; then
         echo ""
         echo "[INFO] Script terminated (exit code: $exit_code)"
@@ -21,9 +25,59 @@ cleanup_on_exit() {
     fi
 }
 
+# Interrupt handler for SIGINT (Ctrl+C)
+interrupt_handler() {
+    echo ""
+    echo "[INFO] Script interrupted by user (Ctrl+C)"
+    echo "[INFO] Cleaning up and exiting gracefully..."
+    
+    # Perform cleanup
+    cleanup_resources
+    
+    # Exit with appropriate code for interrupted processes
+    exit 130
+}
+
+# Global flag to prevent double cleanup
+CLEANUP_DONE=false
+
+# Cleanup resources and temporary state
+cleanup_resources() {
+    # Prevent double cleanup
+    if [ "$CLEANUP_DONE" = true ]; then
+        return
+    fi
+    
+    # Kill any background processes if they exist
+    if [ -n "$CLAUDE_PID" ]; then
+        echo "[INFO] Terminating Claude CLI process (PID: $CLAUDE_PID)..."
+        kill $CLAUDE_PID 2>/dev/null
+        # Wait a bit for graceful termination
+        sleep 1
+        # Force kill if still running
+        kill -9 $CLAUDE_PID 2>/dev/null
+    fi
+    
+    # Kill any other potential background processes started by this script
+    # Check for any timeout processes that might be lingering
+    pkill -f "timeout.*claude" 2>/dev/null
+    
+    # Clean up any temporary files or state
+    # Currently the script doesn't create temp files, but this provides
+    # a placeholder for future enhancements
+    
+    # Reset variables
+    CLAUDE_PID=""
+    
+    # Mark cleanup as done
+    CLEANUP_DONE=true
+    
+    # echo "[INFO] Cleanup completed"
+}
+
 # Set up signal handlers for graceful cleanup
 trap cleanup_on_exit EXIT
-trap 'echo ""; echo "[INFO] Script interrupted by user"; exit 130' INT TERM
+trap interrupt_handler INT TERM
 
 # Function to check network connectivity
 check_network_connectivity() {
@@ -210,8 +264,10 @@ echo "Network connectivity confirmed."
 
 # 1. Run the claude CLI command with timeout protection
 echo "Executing Claude CLI command..."
+CLAUDE_PID=""
 CLAUDE_OUTPUT=$(timeout 30s claude -p 'check' 2>&1)
 RET_CODE=$?
+CLAUDE_PID=""
 
 # Check for timeout scenario (exit code 124 from timeout command)
 if [ $RET_CODE -eq 124 ]; then
@@ -265,9 +321,10 @@ if [ -n "$LIMIT_MSG" ]; then
       else
         echo "Claude usage limit detected. Waiting until $RESUME_TIME_FMT..."
       fi
-      # Live countdown
+      # Live countdown (interruptible with Ctrl+C)
       while [ $WAIT_SECONDS -gt 0 ]; do
         printf "\rResuming in %02d:%02d:%02d..." $((WAIT_SECONDS/3600)) $(( (WAIT_SECONDS%3600)/60 )) $((WAIT_SECONDS%60))
+        # Sleep is interruptible by signal handlers
         sleep 1
         NOW_TIMESTAMP=$(date +%s)
         WAIT_SECONDS=$((RESUME_TIMESTAMP - NOW_TIMESTAMP))
@@ -275,10 +332,12 @@ if [ -n "$LIMIT_MSG" ]; then
       printf "\rResume time has arrived. Retrying now.           \n"
     else
       echo "Claude usage limit detected. Waiting (failed to format resume time, raw timestamp: $RESUME_TIMESTAMP)..."
+      # Sleep is interruptible by signal handlers
       sleep $WAIT_SECONDS
     fi
   fi
 
+  # Brief pause before resuming (interruptible)
   sleep 10
   
   # Re-check network connectivity before resuming
@@ -291,12 +350,17 @@ if [ -n "$LIMIT_MSG" ]; then
   
   if [ "$USE_CONTINUE_FLAG" = true ]; then
     echo "Automatically continuing previous Claude conversation with prompt: '$CUSTOM_PROMPT'"
+    CLAUDE_PID=""
     CLAUDE_OUTPUT2=$(claude -c --dangerously-skip-permissions -p "$CUSTOM_PROMPT" 2>&1)
+    RET_CODE2=$?
+    CLAUDE_PID=""
   else
     echo "Automatically starting new Claude session with prompt: '$CUSTOM_PROMPT'"
+    CLAUDE_PID=""
     CLAUDE_OUTPUT2=$(claude --dangerously-skip-permissions -p "$CUSTOM_PROMPT" 2>&1)
+    RET_CODE2=$?
+    CLAUDE_PID=""
   fi
-  RET_CODE2=$?
   
   if [ $RET_CODE2 -ne 0 ]; then
     echo "[ERROR] Claude CLI failed after resume."
