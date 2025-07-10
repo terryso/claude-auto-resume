@@ -4,12 +4,18 @@
 # Depends only on standard shell commands and claude CLI
 
 # Version information
-VERSION="1.2.0"
+VERSION="1.3.0"
 
 # Default prompt to use when resuming
 DEFAULT_PROMPT="continue"
 # Default is to start new session (no -c flag)
 USE_CONTINUE_FLAG=false
+# Custom command execution mode
+EXECUTE_MODE=false
+CUSTOM_COMMAND=""
+# Test mode for simulating usage limits
+TEST_MODE=false
+TEST_WAIT_SECONDS=0
 
 # Cleanup function for graceful termination
 cleanup_on_exit() {
@@ -62,6 +68,10 @@ cleanup_resources() {
     # Check for any timeout processes that might be lingering
     pkill -f "timeout.*claude" 2>/dev/null
     
+    # Kill any background processes from custom commands
+    # This is a placeholder - specific cleanup would depend on the commands being run
+    # Users should ensure their custom commands handle cleanup appropriately
+    
     # Clean up any temporary files or state
     # Currently the script doesn't create temp files, but this provides
     # a placeholder for future enhancements
@@ -78,6 +88,48 @@ cleanup_resources() {
 # Set up signal handlers for graceful cleanup
 trap cleanup_on_exit EXIT
 trap interrupt_handler INT TERM
+
+# Function to execute custom commands with proper error handling
+execute_custom_command() {
+    local command="$1"
+    local start_time=$(date +%s)
+    
+    echo "⚠️  WARNING: About to execute custom command: '$command'"
+    echo "⚠️  This command will be executed with full shell privileges."
+    echo "⚠️  Press Ctrl+C within 5 seconds to cancel..."
+    
+    # 5-second countdown for user to cancel
+    for i in 5 4 3 2 1; do
+        printf "\rExecuting in %d seconds... " $i
+        sleep 1
+    done
+    printf "\rExecuting custom command...                    \n"
+    
+    echo "Executing: $command"
+    echo "===================="
+    
+    # Execute the command with proper error handling
+    # Use eval to support complex commands with pipes and redirections
+    eval "$command"
+    local exit_code=$?
+    
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    
+    echo "===================="
+    echo "Command completed with exit code: $exit_code"
+    echo "Execution time: ${duration} seconds"
+    
+    if [ $exit_code -eq 0 ]; then
+        echo "✓ Custom command executed successfully."
+    else
+        echo "✗ Custom command failed with exit code: $exit_code"
+        echo "[HINT] Check the command syntax and permissions."
+        echo "[DEBUG] Command: $command"
+    fi
+    
+    return $exit_code
+}
 
 # Function to check network connectivity
 check_network_connectivity() {
@@ -138,16 +190,23 @@ Automatically resume Claude CLI tasks after usage limits are lifted.
 OPTIONS:
     -p, --prompt PROMPT    Custom prompt (default: "continue")
     -c, --continue        Continue previous conversation
+    -e, --execute COMMAND  Execute custom command after usage limit wait period
+    --cmd COMMAND         Execute custom command after usage limit wait period (alias for -e)
     -h, --help           Show this help
     -v, --version        Show version information
     --check              Show system check information
+    --test-mode SECONDS   [DEV] Simulate usage limit with specified wait time in seconds
 
 EXAMPLES:
     claude-auto-resume "implement feature"
     claude-auto-resume -c "continue task"
     claude-auto-resume -p "write tests"
+    claude-auto-resume -e "npm run dev"     # Executes after usage limit wait
+    claude-auto-resume --cmd "python app.py"  # Executes after usage limit wait
+    claude-auto-resume --test-mode 10 -e "echo test"  # [DEV] Test with 10s wait
 
 ⚠️  Uses --dangerously-skip-permissions. Use only in trusted environments.
+⚠️  Custom command execution allows arbitrary shell commands. Use with caution.
 
 EOF
 }
@@ -158,12 +217,29 @@ CUSTOM_PROMPT="$DEFAULT_PROMPT"
 while [[ $# -gt 0 ]]; do
     case $1 in
         -p|--prompt)
+            if [ -z "$2" ]; then
+                echo "[ERROR] Option $1 requires a prompt argument."
+                echo "[HINT] Provide a prompt after $1 flag."
+                echo "[SUGGESTION] Example: claude-auto-resume $1 'continue with task'"
+                exit 1
+            fi
             CUSTOM_PROMPT="$2"
             shift 2
             ;;
         -c|--continue)
             USE_CONTINUE_FLAG=true
             shift
+            ;;
+        -e|--execute|--cmd)
+            if [ -z "$2" ]; then
+                echo "[ERROR] Option $1 requires a command argument."
+                echo "[HINT] Provide a command to execute after $1 flag."
+                echo "[SUGGESTION] Example: claude-auto-resume $1 'npm run dev'"
+                exit 1
+            fi
+            EXECUTE_MODE=true
+            CUSTOM_COMMAND="$2"
+            shift 2
             ;;
         -h|--help)
             show_help
@@ -172,6 +248,17 @@ while [[ $# -gt 0 ]]; do
         -v|--version)
             echo "claude-auto-resume v${VERSION}"
             exit 0
+            ;;
+        --test-mode)
+            if [ -z "$2" ] || ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                echo "[ERROR] Option $1 requires a valid number of seconds."
+                echo "[HINT] Provide number of seconds to simulate wait period."
+                echo "[SUGGESTION] Example: claude-auto-resume --test-mode 10 -e 'echo test'"
+                exit 1
+            fi
+            TEST_MODE=true
+            TEST_WAIT_SECONDS="$2"
+            shift 2
             ;;
         --check)
             # Display comprehensive system check information
@@ -252,8 +339,25 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate Claude CLI environment before proceeding
-validate_claude_cli
+# Validate command-line arguments
+if [ "$EXECUTE_MODE" = true ] && [ "$USE_CONTINUE_FLAG" = true ]; then
+    echo "[ERROR] Cannot use both custom command execution (-e/--execute/--cmd) and continue flag (-c/--continue)."
+    echo "[HINT] Choose either Claude conversation continuation or custom command execution."
+    echo "[SUGGESTION] Use 'claude-auto-resume --help' to see usage examples."
+    exit 1
+fi
+
+if [ "$EXECUTE_MODE" = true ] && [ -z "$CUSTOM_COMMAND" ]; then
+    echo "[ERROR] Custom command cannot be empty when using execute mode."
+    echo "[HINT] Provide a command to execute after -e/--execute/--cmd flag."
+    echo "[SUGGESTION] Example: claude-auto-resume -e 'npm run dev'"
+    exit 1
+fi
+
+# Validate Claude CLI environment before proceeding (skip if in execute mode)
+if [ "$EXECUTE_MODE" = false ]; then
+    validate_claude_cli
+fi
 
 # Check network connectivity before proceeding
 echo "Checking network connectivity..."
@@ -262,24 +366,45 @@ if ! check_network_connectivity; then
 fi
 echo "Network connectivity confirmed."
 
-# 1. Run the claude CLI command with timeout protection
-echo "Executing Claude CLI command..."
-CLAUDE_PID=""
-CLAUDE_OUTPUT=$(timeout 30s claude -p 'check' 2>&1)
-RET_CODE=$?
-CLAUDE_PID=""
+# 1. Run the claude CLI command with timeout protection (unless in execute mode)
+if [ "$EXECUTE_MODE" = true ]; then
+    echo "Execute mode detected. Checking for usage limits..."
+    # In execute mode, we still need to check Claude usage limits
+    # but skip if Claude CLI is not available
+    if command -v claude &> /dev/null; then
+        CLAUDE_PID=""
+        CLAUDE_OUTPUT=$(timeout 30s claude -p 'check' 2>&1)
+        RET_CODE=$?
+        CLAUDE_PID=""
+    else
+        echo "[WARNING] Claude CLI not found. Skipping usage limit check in execute mode."
+        CLAUDE_OUTPUT=""
+        RET_CODE=0
+    fi
+else
+    echo "Executing Claude CLI command..."
+    CLAUDE_PID=""
+    CLAUDE_OUTPUT=$(timeout 30s claude -p 'check' 2>&1)
+    RET_CODE=$?
+    CLAUDE_PID=""
+fi
 
 # Check for timeout scenario (exit code 124 from timeout command)
 if [ $RET_CODE -eq 124 ]; then
-    echo "[ERROR] Claude CLI operation timed out after 30 seconds."
-    echo "[HINT] This may indicate network issues or Claude service problems."
-    echo "[SUGGESTION] Try again in a few minutes, or check Claude service status."
-    echo "[DEBUG] Command executed: timeout 30s claude -p 'check'"
-    exit 3
+    if [ "$EXECUTE_MODE" = true ]; then
+        echo "[WARNING] Claude CLI operation timed out after 30 seconds in execute mode."
+        echo "[HINT] Will proceed with custom command execution without usage limit detection."
+    else
+        echo "[ERROR] Claude CLI operation timed out after 30 seconds."
+        echo "[HINT] This may indicate network issues or Claude service problems."
+        echo "[SUGGESTION] Try again in a few minutes, or check Claude service status."
+        echo "[DEBUG] Command executed: timeout 30s claude -p 'check'"
+        exit 3
+    fi
 fi
 
 # Check for empty or malformed output
-if [ -z "$CLAUDE_OUTPUT" ] && [ $RET_CODE -eq 0 ]; then
+if [ -z "$CLAUDE_OUTPUT" ] && [ $RET_CODE -eq 0 ] && [ "$EXECUTE_MODE" = false ]; then
     echo "[ERROR] Claude CLI returned empty output unexpectedly."
     echo "[HINT] This may indicate Claude CLI installation or configuration issues."
     echo "[SUGGESTION] Try running 'claude --help' to verify CLI is working properly."
@@ -290,19 +415,33 @@ fi
 # 2. Check if usage limit is reached (output format: Claude AI usage limit reached|<timestamp>)
 LIMIT_MSG=$(echo "$CLAUDE_OUTPUT" | grep "Claude AI usage limit reached")
 
+# Test mode: simulate usage limit
+if [ "$TEST_MODE" = true ]; then
+  echo "[TEST MODE] Simulating usage limit with ${TEST_WAIT_SECONDS} seconds wait time..."
+  LIMIT_MSG="Claude AI usage limit reached|simulated"
+fi
+
 if [ -n "$LIMIT_MSG" ]; then
   # Enter usage limit handling logic
-  RESUME_TIMESTAMP=$(echo "$CLAUDE_OUTPUT" | awk -F'|' '{print $2}')
-  if ! [[ "$RESUME_TIMESTAMP" =~ ^[0-9]+$ ]] || [ "$RESUME_TIMESTAMP" -le 0 ]; then
-    echo "[ERROR] Failed to extract a valid resume timestamp from Claude output."
-    echo "[HINT] Expected format: 'Claude AI usage limit reached|<timestamp>'"
-    echo "[SUGGESTION] Check if Claude CLI output format has changed."
-    echo "[DEBUG] Raw output: $CLAUDE_OUTPUT"
-    echo "[DEBUG] Extracted timestamp: '$RESUME_TIMESTAMP'"
-    exit 2
+  if [ "$TEST_MODE" = true ]; then
+    # Test mode: use custom wait time
+    NOW_TIMESTAMP=$(date +%s)
+    RESUME_TIMESTAMP=$((NOW_TIMESTAMP + TEST_WAIT_SECONDS))
+    WAIT_SECONDS=$TEST_WAIT_SECONDS
+  else
+    # Normal mode: extract timestamp from Claude output
+    RESUME_TIMESTAMP=$(echo "$CLAUDE_OUTPUT" | awk -F'|' '{print $2}')
+    if ! [[ "$RESUME_TIMESTAMP" =~ ^[0-9]+$ ]] || [ "$RESUME_TIMESTAMP" -le 0 ]; then
+      echo "[ERROR] Failed to extract a valid resume timestamp from Claude output."
+      echo "[HINT] Expected format: 'Claude AI usage limit reached|<timestamp>'"
+      echo "[SUGGESTION] Check if Claude CLI output format has changed."
+      echo "[DEBUG] Raw output: $CLAUDE_OUTPUT"
+      echo "[DEBUG] Extracted timestamp: '$RESUME_TIMESTAMP'"
+      exit 2
+    fi
+    NOW_TIMESTAMP=$(date +%s)
+    WAIT_SECONDS=$((RESUME_TIMESTAMP - NOW_TIMESTAMP))
   fi
-  NOW_TIMESTAMP=$(date +%s)
-  WAIT_SECONDS=$((RESUME_TIMESTAMP - NOW_TIMESTAMP))
   if [ $WAIT_SECONDS -le 0 ]; then
     echo "Resume time has arrived. Retrying now."
   else
@@ -340,44 +479,61 @@ if [ -n "$LIMIT_MSG" ]; then
   # Brief pause before resuming (interruptible)
   sleep 10
   
-  # Re-check network connectivity before resuming
-  echo "Re-checking network connectivity before resuming..."
-  if ! check_network_connectivity; then
-    echo "[ERROR] Network connectivity lost during wait period."
-    echo "[SUGGESTION] Please check your internet connection and run the script again."
-    exit 3
+  # Re-check network connectivity before resuming (skip in execute mode)
+  if [ "$EXECUTE_MODE" = false ]; then
+    echo "Re-checking network connectivity before resuming..."
+    if ! check_network_connectivity; then
+      echo "[ERROR] Network connectivity lost during wait period."
+      echo "[SUGGESTION] Please check your internet connection and run the script again."
+      exit 3
+    fi
   fi
   
-  if [ "$USE_CONTINUE_FLAG" = true ]; then
-    echo "Automatically continuing previous Claude conversation with prompt: '$CUSTOM_PROMPT'"
-    CLAUDE_PID=""
-    CLAUDE_OUTPUT2=$(claude -c --dangerously-skip-permissions -p "$CUSTOM_PROMPT" 2>&1)
+  # Execute the appropriate command based on mode
+  if [ "$EXECUTE_MODE" = true ]; then
+    echo "Executing custom command after wait period..."
+    execute_custom_command "$CUSTOM_COMMAND"
     RET_CODE2=$?
-    CLAUDE_PID=""
+    
+    if [ $RET_CODE2 -ne 0 ]; then
+      echo "[ERROR] Custom command failed with exit code: $RET_CODE2"
+      echo "[HINT] Check the command syntax and permissions."
+      echo "[DEBUG] Command: $CUSTOM_COMMAND"
+      exit 4
+    fi
+    echo "Custom command has been executed successfully."
   else
-    echo "Automatically starting new Claude session with prompt: '$CUSTOM_PROMPT'"
-    CLAUDE_PID=""
-    CLAUDE_OUTPUT2=$(claude --dangerously-skip-permissions -p "$CUSTOM_PROMPT" 2>&1)
-    RET_CODE2=$?
-    CLAUDE_PID=""
+    if [ "$USE_CONTINUE_FLAG" = true ]; then
+      echo "Automatically continuing previous Claude conversation with prompt: '$CUSTOM_PROMPT'"
+      CLAUDE_PID=""
+      CLAUDE_OUTPUT2=$(claude -c --dangerously-skip-permissions -p "$CUSTOM_PROMPT" 2>&1)
+      RET_CODE2=$?
+      CLAUDE_PID=""
+    else
+      echo "Automatically starting new Claude session with prompt: '$CUSTOM_PROMPT'"
+      CLAUDE_PID=""
+      CLAUDE_OUTPUT2=$(claude --dangerously-skip-permissions -p "$CUSTOM_PROMPT" 2>&1)
+      RET_CODE2=$?
+      CLAUDE_PID=""
+    fi
+    
+    if [ $RET_CODE2 -ne 0 ]; then
+      echo "[ERROR] Claude CLI failed after resume."
+      echo "[HINT] This may indicate authentication issues or service problems."
+      echo "[SUGGESTION] Try running 'claude --help' to verify CLI is working properly."
+      echo "[DEBUG] Exit code: $RET_CODE2"
+      echo "[DEBUG] Output: $CLAUDE_OUTPUT2"
+      exit 4
+    fi
+    echo "Task has been automatically resumed and completed."
+    printf "CLAUDE_OUTPUT: \n"
+    echo "$CLAUDE_OUTPUT2"
   fi
-  
-  if [ $RET_CODE2 -ne 0 ]; then
-    echo "[ERROR] Claude CLI failed after resume."
-    echo "[HINT] This may indicate authentication issues or service problems."
-    echo "[SUGGESTION] Try running 'claude --help' to verify CLI is working properly."
-    echo "[DEBUG] Exit code: $RET_CODE2"
-    echo "[DEBUG] Output: $CLAUDE_OUTPUT2"
-    exit 4
-  fi
-  echo "Task has been automatically resumed and completed."
-  printf "CLAUDE_OUTPUT: \n"
-  echo "$CLAUDE_OUTPUT2"
   exit 0
 fi
 
 # 3. If not usage limit, but CLI failed, show error
-if [ $RET_CODE -ne 0 ]; then
+if [ $RET_CODE -ne 0 ] && [ "$EXECUTE_MODE" = false ]; then
   echo "[ERROR] Claude CLI execution failed."
   echo "[HINT] This may indicate authentication, network, or service issues."
   echo "[SUGGESTION] Check your Claude CLI authentication and try again."
@@ -385,6 +541,14 @@ if [ $RET_CODE -ne 0 ]; then
   echo "[DEBUG] Command executed: claude -p 'check'"
   echo "[DEBUG] Output: $CLAUDE_OUTPUT"
   exit 1
+fi
+
+# 4. Handle execute mode when no usage limit is detected
+if [ "$EXECUTE_MODE" = true ]; then
+  echo "No usage limit detected. Custom command will only execute after a usage limit wait period."
+  echo "Since there is no usage limit, the custom command will not be executed."
+  echo "Use claude-auto-resume in execute mode only when you expect usage limits."
+  exit 0
 fi
 
 echo "No waiting required. Task completed."

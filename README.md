@@ -34,6 +34,9 @@ This script is particularly useful when using Claude Code for development in the
 - ⏰ Smart waiting with countdown display
 - 🚀 Automatic task resumption
 - 🔧 Custom command execution after wait periods
+- 🛡️ Security warnings with cancellation options
+- 🔗 Support for complex commands (pipes, redirections, operators)
+- 🧪 Built-in test mode for development and validation
 - 🖥️ Cross-platform support (Linux/macOS)
 - 📦 Zero external dependencies (only standard Unix tools required)
 
@@ -141,7 +144,10 @@ chmod +x claude-auto-resume.sh
 - **-c, --continue**: Continue previous conversation (adds -c flag to claude command)
 - **-e, --execute**: Execute custom shell command after wait period (e.g., `claude-auto-resume -e "npm run dev"`)
 - **--cmd**: Alias for -e/--execute (e.g., `claude-auto-resume --cmd "python app.py"`)
+- **--test-mode**: [DEV] Simulate usage limit with specified wait time in seconds
 - **-h, --help**: Show help message and usage examples
+- **-v, --version**: Show version information
+- **--check**: Show system check information
 
 ## Session Types
 
@@ -163,9 +169,18 @@ claude-auto-resume -c -p "resume work"       # Continue with flag
 ### Execute Custom Commands
 Execute any shell command after the wait period:
 ```bash
-claude-auto-resume -e "npm run dev"          # Start development server
-claude-auto-resume --cmd "python app.py"     # Run Python application
-claude-auto-resume -e "make build && ./app"  # Complex command with pipes
+claude-auto-resume -e "npm run dev"                    # Start development server
+claude-auto-resume --cmd "python app.py"               # Run Python application
+claude-auto-resume -e "make build && ./app"            # Complex command with operators
+claude-auto-resume -e "ls -la | grep '.js' | wc -l"    # Pipeline commands
+claude-auto-resume -e "echo 'Step 1'; echo 'Step 2'"   # Multiple commands
+```
+
+### Development and Testing
+Use the built-in test mode for development and validation:
+```bash
+claude-auto-resume --test-mode 5 -e "echo 'Test command'"    # Test with 5-second wait
+claude-auto-resume --test-mode 10 --cmd "npm run test"       # Test build process
 ```
 
 ## Requirements
