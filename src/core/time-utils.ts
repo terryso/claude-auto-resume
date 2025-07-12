@@ -3,6 +3,8 @@
  */
 
 import { ClaudeAutoResumeError } from '../utils/errors';
+import { createProgressBar, withProgress } from '../utils/progress';
+import { logger } from '../utils';
 
 /**
  * Platform information for cross-platform compatibility
@@ -98,6 +100,24 @@ export class TimeUtils {
    * Formats a duration in seconds to human-readable format
    */
   static formatDuration(seconds: number): string {
+    if (seconds <= 0) return '0 seconds';
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    const parts: string[] = [];
+    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+    if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+    if (secs > 0 || parts.length === 0) parts.push(`${secs} second${secs !== 1 ? 's' : ''}`);
+
+    return parts.join(', ');
+  }
+
+  /**
+   * Formats a duration with short format (for progress bars)
+   */
+  static formatDurationShort(seconds: number): string {
     if (seconds <= 0) return '0s';
 
     const hours = Math.floor(seconds / 3600);
@@ -110,6 +130,63 @@ export class TimeUtils {
     if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
 
     return parts.join(' ');
+  }
+
+  /**
+   * Formats relative time (e.g., "in 5 minutes", "2 hours ago")
+   */
+  static formatRelativeTime(targetTimestamp: number): string {
+    const now = Date.now() / 1000;
+    const diff = targetTimestamp - now;
+    const absDiff = Math.abs(diff);
+
+    if (absDiff < 60) {
+      const seconds = Math.floor(absDiff);
+      if (diff > 0) {
+        return `in ${seconds} second${seconds !== 1 ? 's' : ''}`;
+      } else {
+        return `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
+      }
+    } else if (absDiff < 3600) {
+      const minutes = Math.floor(absDiff / 60);
+      if (diff > 0) {
+        return `in ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+      } else {
+        return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+      }
+    } else if (absDiff < 86400) {
+      const hours = Math.floor(absDiff / 3600);
+      if (diff > 0) {
+        return `in ${hours} hour${hours !== 1 ? 's' : ''}`;
+      } else {
+        return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+      }
+    } else {
+      const days = Math.floor(absDiff / 86400);
+      if (diff > 0) {
+        return `in ${days} day${days !== 1 ? 's' : ''}`;
+      } else {
+        return `${days} day${days !== 1 ? 's' : ''} ago`;
+      }
+    }
+  }
+
+  /**
+   * Gets a human-readable time display with multiple formats
+   */
+  static getTimeDisplay(timestamp: number): {
+    absolute: string;
+    relative: string;
+    duration: string;
+  } {
+    const now = Date.now() / 1000;
+    const diff = timestamp - now;
+    
+    return {
+      absolute: TimeUtils.timestampToString(timestamp),
+      relative: TimeUtils.formatRelativeTime(timestamp),
+      duration: TimeUtils.formatDuration(Math.max(0, diff))
+    };
   }
 
   /**

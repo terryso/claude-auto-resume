@@ -7,6 +7,7 @@
 
 import { program } from 'commander';
 import { setupCLI } from './cli/commands';
+import { logger } from './utils';
 
 // Export core modules
 export { ClaudeCLI } from './core/claude-cli';
@@ -29,7 +30,7 @@ export async function main(): Promise<void> {
     await setupCLI(program);
     await program.parseAsync(process.argv);
   } catch (error) {
-    console.error('Error:', error instanceof Error ? error.message : 'Unknown error');
+    logger.error('Error:', { error: error instanceof Error ? error.message : 'Unknown error' });
     process.exit(1);
   }
 }
@@ -37,7 +38,7 @@ export async function main(): Promise<void> {
 // Execute main function only when run directly
 if (require.main === module) {
   main().catch((error) => {
-    console.error('Fatal error:', error);
+    logger.error('Fatal error:', { error });
     process.exit(1);
   });
 }

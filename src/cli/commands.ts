@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { CLIOptions } from './types';
 import { loadConfiguration } from '../config';
 import { ClaudeCLI, CommandExecutor } from '../core';
-import { logger, validatePrompt } from '../utils';
+import { logger, LogLevel, validatePrompt } from '../utils';
 
 /**
  * Sets up the CLI commands and options
@@ -31,27 +31,100 @@ export async function setupCLI(program: Command): Promise<void> {
       parseInt
     )
     .option('--check', 'Show system check information')
+    .option('-v, --verbose', 'Enable verbose logging (INFO level)')
+    .option('-q, --quiet', 'Enable quiet mode (ERROR level only)')
+    .option('--debug', 'Enable debug mode with comprehensive diagnostic output')
     .argument('[prompt]', 'Custom prompt as positional argument')
     .addHelpText(
       'after',
       `
-Examples:
-  $ claude-auto-resume                    # Use default prompt "continue"
-  $ claude-auto-resume "fix the bug"      # Use custom prompt
-  $ claude-auto-resume -p "continue"      # Use custom prompt via flag
-  $ claude-auto-resume -c "review code"   # Continue previous conversation
-  $ claude-auto-resume -e "npm test"      # Execute command after wait period
-  $ claude-auto-resume --cmd "python app.py"  # Execute after usage limit wait
-  $ claude-auto-resume --test-mode 10 -e "echo test"  # [DEV] Test with 10s wait
-  $ npx claude-auto-resume "help me"      # Run via npx without installing
-  
-Install globally:
-  $ npm install -g claude-auto-resume
-  
-Use without installing:
-  $ npx claude-auto-resume [options] [prompt]
+BASIC USAGE:
+  $ claude-auto-resume                          # Default prompt "continue"
+  $ claude-auto-resume "fix the bug"            # Custom prompt
+  $ claude-auto-resume -p "continue coding"     # Custom prompt via flag
+  $ claude-auto-resume -c "review my changes"   # Continue previous conversation
 
-⚠️  Security Warning: Default uses --dangerously-skip-permissions. Use only in trusted environments.`
+CUSTOM COMMAND EXECUTION:
+  $ claude-auto-resume -e "npm test"            # Run tests after usage limit
+  $ claude-auto-resume --cmd "python app.py"   # Run Python app (alias for -e)
+  $ claude-auto-resume -e "git push origin main" # Deploy after waiting
+
+LOGGING & VERBOSITY:
+  $ claude-auto-resume --verbose "help me"      # Detailed output (INFO level)
+  $ claude-auto-resume --quiet "continue"       # Errors only (ERROR level)
+  $ claude-auto-resume --debug "fix this"       # Full diagnostic output
+  $ CLAUDE_AUTO_RESUME_LOG_FILE=app.log claude-auto-resume "debug" # Log to file
+
+SYSTEM ADMINISTRATION:
+  $ claude-auto-resume --check                  # System information and health
+  $ claude-auto-resume --test-mode 30 "test"    # [DEV] Simulate 30s usage limit
+
+INSTALLATION:
+  Global installation:
+    $ npm install -g claude-auto-resume
+    $ claude-auto-resume "help me code"
+
+  Without installation:
+    $ npx claude-auto-resume [options] [prompt]
+
+ENVIRONMENT VARIABLES:
+  CLAUDE_AUTO_RESUME_WAIT_BUFFER=30           # Add 30s buffer to wait time
+  CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false   # Require permission prompts
+  CLAUDE_AUTO_RESUME_LOG_FILE=/path/to.log    # Enable file logging
+
+COMMON USAGE SCENARIOS:
+
+  Development Workflow:
+    $ claude-auto-resume -c "review and test my code"
+    $ claude-auto-resume -e "npm run build && npm test"
+
+  Code Reviews:
+    $ claude-auto-resume "please review this pull request"
+    $ claude-auto-resume -c "explain the changes in detail"
+
+  Debugging:
+    $ claude-auto-resume --debug "help debug this error"
+    $ claude-auto-resume -v "analyze the performance issue"
+
+  Long-running Tasks:
+    $ claude-auto-resume -e "npm run deploy:production"
+    $ claude-auto-resume --cmd "docker build -t myapp ."
+
+TROUBLESHOOTING:
+
+  Common Issues:
+    
+    Problem: "Claude CLI not found"
+    Solution: Install Claude CLI first: npm install -g @anthropic/claude-cli
+              Ensure it's in your PATH: which claude
+
+    Problem: "Usage limit reached but no timestamp"
+    Solution: Check Claude CLI output format and ensure version compatibility
+              Use --debug flag for detailed diagnostic information
+
+    Problem: "Permission denied" errors
+    Solution: Set CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false for manual control
+              Check file permissions for log files and working directory
+
+    Problem: "Network connectivity issues"
+    Solution: Check internet connection and firewall settings
+              Use --debug for network diagnostic information
+
+    Problem: "Command execution fails"
+    Solution: Test command manually first: <your-command>
+              Use absolute paths for commands and files
+              Check command syntax and permissions
+
+  Getting Help:
+    $ claude-auto-resume --check                # System diagnostics
+    $ claude-auto-resume --debug "test"         # Verbose debugging output
+    Report issues: https://github.com/anthropics/claude-auto-resume/issues
+
+⚠️  SECURITY WARNING:
+    This tool uses --dangerously-skip-permissions by default, which bypasses
+    Claude's safety prompts. Only use in trusted environments with trusted commands.
+    
+    To disable: export CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false`
     )
     .action(async (promptArg: string | undefined, options: CLIOptions) => {
       try {
@@ -59,6 +132,9 @@ Use without installing:
         if (options.cmd && !options.execute) {
           options.execute = options.cmd;
         }
+
+        // Configure logging based on verbosity options
+        configureLogging(options);
 
         // Validate argument combinations
         if (options.execute && options.continue) {
@@ -127,10 +203,41 @@ Use without installing:
           await claudeCli.resume(finalPrompt, options.continue || false, config.skipPermissions);
         }
       } catch (error) {
-        logger.error('Failed to execute command:', error);
+        logger.error('Failed to execute command:', { error });
         process.exit(1);
       }
     });
+}
+
+/**
+ * Configures logging based on CLI options
+ */
+function configureLogging(options: CLIOptions): void {
+  // Set log level based on flags
+  if (options.debug) {
+    logger.setLevel(LogLevel.DEBUG);
+  } else if (options.verbose) {
+    logger.setLevel(LogLevel.INFO);
+  } else if (options.quiet) {
+    logger.setLevel(LogLevel.ERROR);
+  } else {
+    logger.setLevel(LogLevel.INFO); // Default level
+  }
+
+  // Set file output if specified via environment variable
+  const logFile = process.env.CLAUDE_AUTO_RESUME_LOG_FILE;
+  if (logFile) {
+    logger.setFileOutput(logFile);
+    logger.debug('File logging enabled', { logFile });
+  }
+
+  // Log configuration if debug mode
+  if (options.debug) {
+    logger.debug('Logging configuration applied', {
+      level: options.debug ? 'DEBUG' : options.verbose ? 'INFO' : options.quiet ? 'ERROR' : 'INFO',
+      fileOutput: logFile || 'disabled'
+    });
+  }
 }
 
 /**
@@ -179,4 +286,9 @@ async function showSystemCheck(): Promise<void> {
   logger.info(
     `  CLAUDE_AUTO_RESUME_LOG_FILE: ${process.env.CLAUDE_AUTO_RESUME_LOG_FILE || 'Not set'}`
   );
+
+  // Show current logging configuration
+  logger.info('Logging Configuration:');
+  logger.info(`  Log Level: ${LogLevel[logger.getLevel()]}`);
+  logger.info(`  File Output: ${logger.getLogFile() || 'Console only'}`);
 }

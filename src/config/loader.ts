@@ -5,6 +5,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { CLIConfig } from './types';
+import { logger } from '../utils';
+import { autoLoadConfigFile, mergeConfigFile } from './file-loader';
 
 /**
  * Default configuration values
@@ -93,13 +95,32 @@ function parseLogFile(value: string | undefined): string | undefined {
 }
 
 /**
- * Loads configuration from environment variables and defaults
+ * Loads configuration from multiple sources with precedence:
+ * 1. Environment variables (highest priority)
+ * 2. Configuration file
+ * 3. Default values (lowest priority)
+ * 
  * @param exitOnError - Whether to exit process on error (default: true)
  */
 export function loadConfiguration(exitOnError = true): CLIConfig {
   try {
-    const config: CLIConfig = {
-      ...DEFAULT_CONFIG,
+    logger.debug('Loading configuration from multiple sources');
+
+    // Start with defaults
+    let config: CLIConfig = { ...DEFAULT_CONFIG };
+
+    // Load configuration file if available (overrides defaults)
+    const fileConfig = autoLoadConfigFile();
+    if (fileConfig) {
+      logger.info('Configuration file found and loaded');
+      config = mergeConfigFile(config, fileConfig);
+    } else {
+      logger.debug('No configuration file found, using defaults and environment variables only');
+    }
+
+    // Apply environment variables (highest priority - overrides file config)
+    const envConfig: CLIConfig = {
+      ...config,
       waitBuffer: parseWaitBuffer(process.env.CLAUDE_AUTO_RESUME_WAIT_BUFFER),
       skipPermissions: parseSkipPermissions(process.env.CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS),
       logFile: parseLogFile(process.env.CLAUDE_AUTO_RESUME_LOG_FILE),
@@ -107,17 +128,27 @@ export function loadConfiguration(exitOnError = true): CLIConfig {
 
     // Perform runtime validation
     const { validateCLIConfig } = require('../utils/validators');
-    const validation = validateCLIConfig(config);
+    const validation = validateCLIConfig(envConfig);
 
     if (!validation.valid) {
       throw new Error(`Configuration validation failed: ${validation.errors.join(', ')}`);
     }
 
-    return config;
+    logger.debug('Configuration loading completed', {
+      hasFileConfig: !!fileConfig,
+      finalConfig: {
+        defaultPrompt: envConfig.defaultPrompt,
+        waitBuffer: envConfig.waitBuffer,
+        skipPermissions: envConfig.skipPermissions,
+        logFile: envConfig.logFile ? 'set' : 'not set'
+      }
+    });
+
+    return envConfig;
   } catch (error) {
     if (exitOnError) {
       // Re-throw configuration errors with exit code 1
-      console.error(`[ERROR] Configuration validation failed: ${error}`);
+      logger.error('Configuration validation failed', { error });
       process.exit(1);
     } else {
       // Re-throw for testing

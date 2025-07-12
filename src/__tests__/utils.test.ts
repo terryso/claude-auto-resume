@@ -7,8 +7,10 @@ import {
   isCustomError,
   CLIError,
   ClaudeAutoResumeError,
+  ErrorCategory,
   ErrorCodes,
   Errors,
+  EnhancedErrors,
   Logger,
   LogLevel,
   logger,
@@ -106,7 +108,7 @@ describe('Utils Module', () => {
       const errorSpy = jest.spyOn(console, 'error').mockImplementation();
 
       testLogger.error('Test error');
-      expect(errorSpy).toHaveBeenCalledWith('[ERROR] Test error');
+      expect(errorSpy).toHaveBeenCalledWith('[ERROR] Test error', '');
 
       errorSpy.mockRestore();
     });
@@ -115,19 +117,19 @@ describe('Utils Module', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       testLogger.warn('Test warning');
-      expect(warnSpy).toHaveBeenCalledWith('[WARN] Test warning');
+      expect(warnSpy).toHaveBeenCalledWith('[WARN] Test warning', '');
 
       warnSpy.mockRestore();
     });
 
     it('should log info messages', () => {
       testLogger.info('Test info');
-      expect(consoleSpy).toHaveBeenCalledWith('[INFO] Test info');
+      expect(consoleSpy).toHaveBeenCalledWith('[INFO] Test info', '');
     });
 
     it('should log debug messages', () => {
       testLogger.debug('Test debug');
-      expect(consoleSpy).toHaveBeenCalledWith('[DEBUG] Test debug');
+      expect(consoleSpy).toHaveBeenCalledWith('[DEBUG] Test debug', '');
     });
 
     it('should respect log levels', () => {
@@ -146,6 +148,80 @@ describe('Utils Module', () => {
 
     it('should have default logger instance', () => {
       expect(logger).toBeInstanceOf(Logger);
+    });
+
+    it('should support file output configuration', () => {
+      const fs = require('fs');
+      const mockWriteStream = {
+        write: jest.fn(),
+        end: jest.fn()
+      };
+
+      const existsSyncSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      const mkdirSyncSpy = jest.spyOn(fs, 'mkdirSync').mockImplementation();
+      const statSyncSpy = jest.spyOn(fs, 'statSync').mockReturnValue({ size: 1000 });
+      const createWriteStreamSpy = jest.spyOn(fs, 'createWriteStream').mockReturnValue(mockWriteStream);
+
+      const testLoggerWithFile = new Logger();
+      testLoggerWithFile.setFileOutput('/test/path/log.txt');
+
+      expect(testLoggerWithFile.getLogFile()).toBe('/test/path/log.txt');
+
+      testLoggerWithFile.info('Test message');
+      expect(mockWriteStream.write).toHaveBeenCalledWith(
+        expect.stringContaining('[INFO] Test message')
+      );
+
+      testLoggerWithFile.close();
+      expect(mockWriteStream.end).toHaveBeenCalled();
+
+      // Restore mocks
+      existsSyncSpy.mockRestore();
+      mkdirSyncSpy.mockRestore();
+      statSyncSpy.mockRestore();
+      createWriteStreamSpy.mockRestore();
+    });
+
+    it('should support context logging', () => {
+      const testLoggerContext = new Logger();
+      const context = { userId: 123, action: 'test' };
+
+      testLoggerContext.info('Test with context', context);
+      expect(consoleSpy).toHaveBeenCalledWith('[INFO] Test with context', context);
+    });
+
+    it('should get current log level', () => {
+      const testLoggerLevel = new Logger();
+      expect(testLoggerLevel.getLevel()).toBe(LogLevel.INFO);
+
+      testLoggerLevel.setLevel(LogLevel.DEBUG);
+      expect(testLoggerLevel.getLevel()).toBe(LogLevel.DEBUG);
+    });
+
+    it('should clear file output', () => {
+      const fs = require('fs');
+      const mockWriteStream = {
+        write: jest.fn(),
+        end: jest.fn()
+      };
+
+      const existsSyncSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      const mkdirSyncSpy = jest.spyOn(fs, 'mkdirSync').mockImplementation();
+      const statSyncSpy = jest.spyOn(fs, 'statSync').mockReturnValue({ size: 1000 });
+      const createWriteStreamSpy = jest.spyOn(fs, 'createWriteStream').mockReturnValue(mockWriteStream);
+
+      const testLoggerClear = new Logger();
+      testLoggerClear.setFileOutput('/test/path.log');
+      expect(testLoggerClear.getLogFile()).toBe('/test/path.log');
+
+      testLoggerClear.setFileOutput();
+      expect(testLoggerClear.getLogFile()).toBeUndefined();
+
+      // Restore mocks
+      existsSyncSpy.mockRestore();
+      mkdirSyncSpy.mockRestore();
+      statSyncSpy.mockRestore();
+      createWriteStreamSpy.mockRestore();
     });
   });
 
@@ -416,7 +492,7 @@ describe('Utils Module', () => {
 
       const formatted = error.getFormattedMessage();
       expect(formatted).toContain('[ERROR] Test error');
-      expect(formatted).toContain('[DEBUG] Test context');
+      expect(formatted).toContain('[CONTEXT] Test context');
       expect(formatted).toContain('[HINT] Test hint');
     });
 
@@ -425,8 +501,124 @@ describe('Utils Module', () => {
       const formatted = error.getFormattedMessage();
 
       expect(formatted).toBe('[ERROR] Simple error');
-      expect(formatted).not.toContain('[DEBUG]');
+      expect(formatted).not.toContain('[CONTEXT]');
       expect(formatted).not.toContain('[HINT]');
+    });
+
+    it('should create enhanced error with all properties', () => {
+      const error = new ClaudeAutoResumeError(
+        'Test error',
+        2,
+        'Test context',
+        'Test hint',
+        'Test suggestion',
+        'Test troubleshooting',
+        ErrorCategory.VALIDATION
+      );
+
+      expect(error.message).toBe('Test error');
+      expect(error.exitCode).toBe(2);
+      expect(error.context).toBe('Test context');
+      expect(error.hint).toBe('Test hint');
+      expect(error.suggestion).toBe('Test suggestion');
+      expect(error.troubleshootingGuide).toBe('Test troubleshooting');
+      expect(error.category).toBe(ErrorCategory.VALIDATION);
+    });
+
+    it('should format enhanced error message with all fields', () => {
+      const error = new ClaudeAutoResumeError(
+        'Test error',
+        1,
+        'Test context',
+        'Test hint',
+        'Test suggestion',
+        'Test troubleshooting',
+        ErrorCategory.NETWORK
+      );
+
+      const formatted = error.getFormattedMessage();
+      expect(formatted).toContain('[ERROR] Test error');
+      expect(formatted).toContain('[CATEGORY] NETWORK');
+      expect(formatted).toContain('[CONTEXT] Test context');
+      expect(formatted).toContain('[HINT] Test hint');
+      expect(formatted).toContain('[SUGGESTION] Test suggestion');
+      expect(formatted).toContain('[TROUBLESHOOTING] Test troubleshooting');
+    });
+
+    it('should provide recovery recommendations by category', () => {
+      const networkError = new ClaudeAutoResumeError(
+        'Network error',
+        3,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        ErrorCategory.NETWORK
+      );
+
+      const recommendations = networkError.getRecoveryRecommendations();
+      expect(recommendations).toContain('Check your internet connection');
+      expect(recommendations).toContain('Use --debug flag for network diagnostics');
+    });
+
+    it('should provide Claude CLI recovery recommendations', () => {
+      const claudeError = new ClaudeAutoResumeError(
+        'Claude CLI error',
+        1,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        ErrorCategory.CLAUDE_CLI
+      );
+
+      const recommendations = claudeError.getRecoveryRecommendations();
+      expect(recommendations).toContain('Ensure Claude CLI is installed: npm install -g @anthropic/claude-cli');
+      expect(recommendations).toContain('Try running: claude --version');
+    });
+  });
+
+  describe('EnhancedErrors', () => {
+    it('should create enhanced network error', () => {
+      const error = EnhancedErrors.networkError('Connection failed', 'Timeout after 5s');
+      
+      expect(error.message).toContain('Network connectivity issue');
+      expect(error.category).toBe(ErrorCategory.NETWORK);
+      expect(error.exitCode).toBe(3);
+      expect(error.suggestion).toContain('Check internet connection');
+    });
+
+    it('should create enhanced Claude CLI error', () => {
+      const error = EnhancedErrors.claudeCliFailed('Command not found');
+      
+      expect(error.message).toContain('Claude CLI execution failed');
+      expect(error.category).toBe(ErrorCategory.CLAUDE_CLI);
+      expect(error.exitCode).toBe(1);
+      expect(error.troubleshootingGuide).toContain('npm install -g @anthropic/claude-cli');
+    });
+
+    it('should create enhanced configuration error', () => {
+      const error = EnhancedErrors.configurationError('Invalid setting');
+      
+      expect(error.message).toContain('Configuration error');
+      expect(error.category).toBe(ErrorCategory.CONFIGURATION);
+      expect(error.suggestion).toContain('Review configuration settings');
+    });
+
+    it('should create enhanced file system error', () => {
+      const error = EnhancedErrors.fileSystemError('File not found', '/test/path');
+      
+      expect(error.message).toContain('File system error');
+      expect(error.category).toBe(ErrorCategory.FILE_SYSTEM);
+      expect(error.context).toContain('/test/path');
+    });
+
+    it('should create enhanced timeout error', () => {
+      const error = EnhancedErrors.timeoutError('Network request', 5000);
+      
+      expect(error.message).toContain('Operation timed out');
+      expect(error.category).toBe(ErrorCategory.TIMEOUT);
+      expect(error.context).toContain('5000ms');
     });
   });
 });

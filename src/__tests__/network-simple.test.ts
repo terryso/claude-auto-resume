@@ -5,6 +5,25 @@
 // Mock all external dependencies
 jest.mock('child_process');
 
+// Mock progress module to avoid process.on issues in tests
+jest.mock('../utils/progress', () => ({
+  createSpinner: jest.fn(() => ({
+    start: jest.fn(),
+    stop: jest.fn(),
+    succeed: jest.fn(),
+    fail: jest.fn(),
+    update: jest.fn(),
+  })),
+  createProgressBar: jest.fn(() => ({
+    start: jest.fn(),
+    stop: jest.fn(),
+    succeed: jest.fn(),
+    fail: jest.fn(),
+    update: jest.fn(),
+    updateProgress: jest.fn(),
+  })),
+}));
+
 import { NetworkUtils } from '../core/network';
 
 describe('NetworkUtils Simple', () => {
@@ -14,6 +33,11 @@ describe('NetworkUtils Simple', () => {
     // Mock console methods
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
+    
+    // Mock process.on for progress indicators
+    jest.spyOn(process, 'on').mockImplementation(() => process);
+    jest.spyOn(process, 'removeListener').mockImplementation(() => process);
+    jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {

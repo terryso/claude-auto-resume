@@ -22,4 +22,10 @@ export interface CLIOptions {
   help?: boolean;
   /** Show system check information */
   check?: boolean;
+  /** Enable verbose logging */
+  verbose?: boolean;
+  /** Enable quiet mode (errors only) */
+  quiet?: boolean;
+  /** Enable debug mode with comprehensive diagnostic output */
+  debug?: boolean;
 }

@@ -4,6 +4,8 @@
 
 import { spawn } from 'child_process';
 import { ClaudeAutoResumeError } from '../utils/errors';
+import { createSpinner, withSpinner } from '../utils/progress';
+import { logger } from '../utils';
 
 /**
  * Network connectivity result interface
@@ -281,28 +283,56 @@ export class NetworkUtils {
   static async waitForConnectivity(maxWaitTime = 30000): Promise<boolean> {
     const startTime = Date.now();
     let attempt = 1;
+    const spinner = createSpinner('dots');
 
-    console.log('[INFO] Checking network connectivity...');
+    try {
+      spinner.start('Checking network connectivity...');
 
-    while (Date.now() - startTime < maxWaitTime) {
-      const result = await NetworkUtils.checkConnectivity();
+      while (Date.now() - startTime < maxWaitTime) {
+        const result = await NetworkUtils.checkConnectivity();
 
-      if (result.connected) {
-        console.log(
-          `[INFO] Network connectivity restored via ${result.method} (${result.responseTime}ms)`
-        );
-        return true;
+        if (result.connected) {
+          spinner.succeed(
+            `Network connectivity restored via ${result.method} (${result.responseTime}ms)`
+          );
+          logger.info('Network connectivity restored', {
+            method: result.method,
+            responseTime: result.responseTime,
+            attempt
+          });
+          return true;
+        }
+
+        spinner.update(`Attempt ${attempt}: Testing connectivity... (${result.error})`);
+        logger.debug('Network connectivity attempt failed', {
+          attempt,
+          error: result.error,
+          elapsed: Date.now() - startTime
+        });
+        
+        attempt++;
+
+        // Wait before next attempt with spinner update
+        const waitTime = 2000;
+        for (let i = waitTime / 100; i > 0; i--) {
+          spinner.update(`Retrying in ${Math.ceil(i / 10)}s... (Attempt ${attempt - 1} failed)`);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
       }
 
-      console.log(`[INFO] Attempt ${attempt}: No connectivity (${result.error})`);
-      attempt++;
+      spinner.fail('Network connectivity could not be established within timeout period');
+      logger.error('Network connectivity timeout', {
+        maxWaitTime,
+        attempts: attempt - 1,
+        elapsed: Date.now() - startTime
+      });
+      return false;
 
-      // Wait before next attempt
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+    } catch (error) {
+      spinner.fail('Network connectivity check failed');
+      logger.error('Network connectivity check error', { error });
+      return false;
     }
-
-    console.log('[ERROR] Network connectivity could not be established within timeout period');
-    return false;
   }
 
   /**

@@ -9,12 +9,36 @@ jest.mock('child_process', () => ({
   spawn: jest.fn(),
 }));
 
+// Mock progress module to avoid process.on issues in tests
+jest.mock('../utils/progress', () => ({
+  createSpinner: jest.fn(() => ({
+    start: jest.fn(),
+    stop: jest.fn(),
+    succeed: jest.fn(),
+    fail: jest.fn(),
+    update: jest.fn(),
+  })),
+  createProgressBar: jest.fn(() => ({
+    start: jest.fn(),
+    stop: jest.fn(),
+    succeed: jest.fn(),
+    fail: jest.fn(),
+    update: jest.fn(),
+    updateProgress: jest.fn(),
+  })),
+}));
+
 describe('Core Module', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Mock console methods to prevent test output
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
+    
+    // Mock process.on for progress indicators
+    jest.spyOn(process, 'on').mockImplementation(() => process);
+    jest.spyOn(process, 'removeListener').mockImplementation(() => process);
+    jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
@@ -155,22 +179,29 @@ describe('Core Module', () => {
 
     it('should format duration in seconds', () => {
       const formatted = TimeUtils.formatDuration(45);
-      expect(formatted).toBe('45s');
+      expect(formatted).toBe('45 seconds');
     });
 
     it('should format duration in minutes and seconds', () => {
       const formatted = TimeUtils.formatDuration(125);
-      expect(formatted).toBe('2m 5s');
+      expect(formatted).toBe('2 minutes, 5 seconds');
     });
 
     it('should format duration in hours, minutes and seconds', () => {
       const formatted = TimeUtils.formatDuration(3665);
-      expect(formatted).toBe('1h 1m 5s');
+      expect(formatted).toBe('1 hour, 1 minute, 5 seconds');
     });
 
     it('should format zero duration', () => {
       const formatted = TimeUtils.formatDuration(0);
-      expect(formatted).toBe('0s');
+      expect(formatted).toBe('0 seconds');
+    });
+
+    it('should format duration short format', () => {
+      expect(TimeUtils.formatDurationShort(45)).toBe('45s');
+      expect(TimeUtils.formatDurationShort(125)).toBe('2m 5s');
+      expect(TimeUtils.formatDurationShort(3665)).toBe('1h 1m 5s');
+      expect(TimeUtils.formatDurationShort(0)).toBe('0s');
     });
 
     it('should format countdown correctly', () => {
