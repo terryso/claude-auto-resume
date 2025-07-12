@@ -30,7 +30,7 @@ describe('Core Module', () => {
     it('should parse usage limit output correctly', () => {
       const testOutput = 'Claude AI usage limit reached|1704067200';
       const result = claudeCli.parseUsageLimitOutput(testOutput);
-      
+
       expect(result.hasLimit).toBe(true);
       expect(result.resumeTimestamp).toBe(1704067200);
       expect(result.rawOutput).toBe(testOutput);
@@ -38,7 +38,7 @@ describe('Core Module', () => {
 
     it('should parse empty output correctly', () => {
       const result = claudeCli.parseUsageLimitOutput('');
-      
+
       expect(result.hasLimit).toBe(false);
       expect(result.resumeTimestamp).toBeUndefined();
       expect(result.rawOutput).toBe('');
@@ -47,7 +47,7 @@ describe('Core Module', () => {
     it('should parse non-limit output correctly', () => {
       const testOutput = 'Normal Claude response';
       const result = claudeCli.parseUsageLimitOutput(testOutput);
-      
+
       expect(result.hasLimit).toBe(false);
       expect(result.resumeTimestamp).toBeUndefined();
       expect(result.rawOutput).toBe(testOutput);
@@ -70,22 +70,26 @@ describe('Core Module', () => {
 
     it('should execute commands and return output', async () => {
       // Mock executeClaudeCommand to avoid actual CLI execution
-      const spy = jest.spyOn(claudeCli, 'executeClaudeCommand').mockResolvedValue('Mock CLI output');
-      
+      const spy = jest
+        .spyOn(claudeCli, 'executeClaudeCommand')
+        .mockResolvedValue('Mock CLI output');
+
       const result = await claudeCli.execute(['--help']);
       expect(result).toBe('Mock CLI output');
-      
+
       spy.mockRestore();
     });
 
     it('should check usage limit', async () => {
       // Mock executeClaudeCommand to return no limit
-      const spy = jest.spyOn(claudeCli, 'executeClaudeCommand').mockResolvedValue('Normal response');
-      
+      const spy = jest
+        .spyOn(claudeCli, 'executeClaudeCommand')
+        .mockResolvedValue('Normal response');
+
       const result = await claudeCli.checkUsageLimit();
       expect(result).toHaveProperty('hasLimit');
       expect(result.hasLimit).toBe(false);
-      
+
       spy.mockRestore();
     });
 
@@ -217,15 +221,15 @@ describe('Core Module', () => {
     it('should handle waitWithCountdown interruption', async () => {
       const originalAddListener = process.addListener;
       const originalRemoveListener = process.removeListener;
-      
+
       const listeners: { [key: string]: Function[] } = {};
-      
+
       process.addListener = jest.fn((event: string, listener: Function) => {
         if (!listeners[event]) listeners[event] = [];
         listeners[event].push(listener);
         return process;
       });
-      
+
       process.removeListener = jest.fn();
 
       // Mock console methods
@@ -234,7 +238,7 @@ describe('Core Module', () => {
 
       // Start countdown in background
       const countdownPromise = TimeUtils.waitWithCountdown(1);
-      
+
       // Wait a bit then simulate interrupt
       setTimeout(() => {
         const sigintHandlers = listeners['SIGINT'] || [];
@@ -263,7 +267,7 @@ describe('Core Module', () => {
       const spy = jest.spyOn(NetworkUtils, 'checkConnectivityPing').mockResolvedValue({
         connected: true,
         method: 'ping',
-        responseTime: 50
+        responseTime: 50,
       });
 
       const result = await NetworkUtils.checkConnectivity();
@@ -278,7 +282,7 @@ describe('Core Module', () => {
       const spy = jest.spyOn(NetworkUtils, 'checkConnectivity').mockResolvedValue({
         connected: true,
         method: 'ping',
-        responseTime: 50
+        responseTime: 50,
       });
 
       const result = await NetworkUtils.waitForConnectivity(1000);
@@ -291,7 +295,7 @@ describe('Core Module', () => {
       // Mock checkConnectivity to always return no connectivity
       const spy = jest.spyOn(NetworkUtils, 'checkConnectivity').mockResolvedValue({
         connected: false,
-        error: 'No connectivity'
+        error: 'No connectivity',
       });
 
       const result = await NetworkUtils.waitForConnectivity(100);

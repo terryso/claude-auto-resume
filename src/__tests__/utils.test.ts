@@ -22,7 +22,7 @@ import {
   validateCLIOptions,
   validateFilePath,
   validateWritableDirectory,
-  validateConfigurationPrecedence
+  validateConfigurationPrecedence,
 } from '../utils';
 
 describe('Utils Module', () => {
@@ -222,7 +222,7 @@ describe('Utils Module', () => {
             claudeCliPath: 'claude',
             waitBuffer: 0,
             skipPermissions: true,
-            logFile: undefined
+            logFile: undefined,
           };
           expect(isCLIConfig(config)).toBe(true);
         });
@@ -241,7 +241,7 @@ describe('Utils Module', () => {
             prompt: 'test',
             continue: true,
             execute: undefined,
-            testMode: 10
+            testMode: 10,
           };
           expect(isCLIOptions(options)).toBe(true);
         });
@@ -263,7 +263,7 @@ describe('Utils Module', () => {
             maxRetries: 3,
             claudeCliPath: 'claude',
             waitBuffer: 0,
-            skipPermissions: true
+            skipPermissions: true,
           };
           const result = validateCLIConfig(config);
           expect(result.valid).toBe(true);
@@ -277,7 +277,7 @@ describe('Utils Module', () => {
             maxRetries: -1,
             claudeCliPath: '',
             waitBuffer: -1,
-            skipPermissions: 'invalid' as any
+            skipPermissions: 'invalid' as any,
           };
           const result = validateCLIConfig(config);
           expect(result.valid).toBe(false);
@@ -292,7 +292,7 @@ describe('Utils Module', () => {
             claudeCliPath: 'claude',
             waitBuffer: 0,
             skipPermissions: true,
-            logFile: '/tmp/test.log'
+            logFile: '/tmp/test.log',
           };
           const result = validateCLIConfig(validConfig);
           expect(result.valid).toBe(true);
@@ -306,7 +306,7 @@ describe('Utils Module', () => {
             claudeCliPath: 'claude',
             waitBuffer: 0,
             skipPermissions: true,
-            logFile: ''  // Empty string
+            logFile: '', // Empty string
           };
           const result = validateCLIConfig(invalidConfig);
           expect(result.valid).toBe(false);
@@ -321,11 +321,11 @@ describe('Utils Module', () => {
             claudeCliPath: 'claude',
             waitBuffer: 0,
             skipPermissions: true,
-            logFile: '/root/forbidden/test.log'  // Non-writable
+            logFile: '/root/forbidden/test.log', // Non-writable
           };
           const result = validateCLIConfig(invalidConfig);
           expect(result.valid).toBe(false);
-          expect(result.errors.some(error => error.includes('not writable'))).toBe(true);
+          expect(result.errors.some((error) => error.includes('not writable'))).toBe(true);
         });
       });
 
@@ -334,7 +334,7 @@ describe('Utils Module', () => {
           const options = {
             prompt: 'test',
             continue: false,
-            testMode: 10
+            testMode: 10,
           };
           const result = validateCLIOptions(options);
           expect(result.valid).toBe(true);
@@ -344,7 +344,7 @@ describe('Utils Module', () => {
         it('should reject conflicting options', () => {
           const options = {
             execute: 'echo test',
-            continue: true
+            continue: true,
           };
           const result = validateCLIOptions(options);
           expect(result.valid).toBe(false);
@@ -388,10 +388,10 @@ describe('Utils Module', () => {
             maxRetries: 3,
             claudeCliPath: 'claude',
             waitBuffer: 0,
-            skipPermissions: true
+            skipPermissions: true,
           }
         );
-        
+
         expect(result.valid).toBe(true);
         expect(result.precedenceOrder).toContain('CLI arguments');
         expect(result.precedenceOrder).toContain('Environment variables');
@@ -402,12 +402,7 @@ describe('Utils Module', () => {
 
   describe('ClaudeAutoResumeError', () => {
     it('should create ClaudeAutoResumeError with all properties', () => {
-      const error = new ClaudeAutoResumeError(
-        'Test error',
-        2,
-        'Test context',
-        'Test hint'
-      );
+      const error = new ClaudeAutoResumeError('Test error', 2, 'Test context', 'Test hint');
 
       expect(error.message).toBe('Test error');
       expect(error.exitCode).toBe(2);
@@ -417,12 +412,7 @@ describe('Utils Module', () => {
     });
 
     it('should format ClaudeAutoResumeError message', () => {
-      const error = new ClaudeAutoResumeError(
-        'Test error',
-        1,
-        'Test context',
-        'Test hint'
-      );
+      const error = new ClaudeAutoResumeError('Test error', 1, 'Test context', 'Test hint');
 
       const formatted = error.getFormattedMessage();
       expect(formatted).toContain('[ERROR] Test error');
@@ -433,7 +423,7 @@ describe('Utils Module', () => {
     it('should handle ClaudeAutoResumeError without context and hint', () => {
       const error = new ClaudeAutoResumeError('Simple error', 1);
       const formatted = error.getFormattedMessage();
-      
+
       expect(formatted).toBe('[ERROR] Simple error');
       expect(formatted).not.toContain('[DEBUG]');
       expect(formatted).not.toContain('[HINT]');

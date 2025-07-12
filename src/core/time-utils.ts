@@ -30,7 +30,7 @@ export class TimeUtils {
   static parseTimestamp(timestampStr: string): number {
     try {
       let timestamp: number;
-      
+
       // Check if it's an ISO date string (contains T or dashes)
       if (timestampStr.includes('T') || timestampStr.includes('-')) {
         const date = new Date(timestampStr);
@@ -41,25 +41,25 @@ export class TimeUtils {
       } else {
         // Try parsing as Unix timestamp
         timestamp = parseInt(timestampStr, 10);
-        
+
         if (isNaN(timestamp)) {
           throw new Error('Invalid timestamp format');
         }
-        
+
         // If it looks like milliseconds, convert to seconds
         if (timestamp > 1e12) {
           timestamp = Math.floor(timestamp / 1000);
         }
       }
-      
+
       // Validate timestamp is reasonable (between 1970 and far future)
       const minTimestamp = 0; // Unix epoch
       const maxTimestamp = 4102444800; // Year 2100
-      
+
       if (timestamp < minTimestamp || timestamp > maxTimestamp) {
         throw new Error('Timestamp out of reasonable range');
       }
-      
+
       return timestamp;
     } catch (error) {
       throw new ClaudeAutoResumeError(
@@ -75,7 +75,7 @@ export class TimeUtils {
    * @param resumeTimestamp - Unix timestamp in seconds when to resume
    * @param waitBuffer - Additional wait time in seconds
    */
-  static calculateWaitTime(resumeTimestamp: number, waitBuffer: number = 0): number {
+  static calculateWaitTime(resumeTimestamp: number, waitBuffer = 0): number {
     const currentTime = Math.floor(Date.now() / 1000);
     const waitSeconds = Math.max(0, resumeTimestamp - currentTime + waitBuffer);
     return waitSeconds;
@@ -86,11 +86,11 @@ export class TimeUtils {
    */
   static formatCountdown(seconds: number): string {
     if (seconds <= 0) return '00:00:00';
-    
+
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
@@ -99,16 +99,16 @@ export class TimeUtils {
    */
   static formatDuration(seconds: number): string {
     if (seconds <= 0) return '0s';
-    
+
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     const parts: string[] = [];
     if (hours > 0) parts.push(`${hours}h`);
     if (minutes > 0) parts.push(`${minutes}m`);
     if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
-    
+
     return parts.join(' ');
   }
 
@@ -164,7 +164,7 @@ export class TimeUtils {
       while (remaining > 0 && !interrupted) {
         const countdown = TimeUtils.formatCountdown(remaining);
         process.stdout.write(`\r[COUNTDOWN] Time remaining: ${countdown}`);
-        
+
         await new Promise((resolve) => setTimeout(resolve, 1000));
         remaining--;
       }
@@ -185,7 +185,9 @@ export class TimeUtils {
   static applyWaitBuffer(waitSeconds: number, bufferSeconds: number): number {
     const total = waitSeconds + bufferSeconds;
     if (bufferSeconds > 0) {
-      console.log(`[INFO] Applied wait buffer: +${bufferSeconds}s (total: ${TimeUtils.formatDuration(total)})`);
+      console.log(
+        `[INFO] Applied wait buffer: +${bufferSeconds}s (total: ${TimeUtils.formatDuration(total)})`
+      );
     }
     return total;
   }

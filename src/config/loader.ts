@@ -29,8 +29,8 @@ function parseWaitBuffer(value: string | undefined): number {
   if (isNaN(parsed) || parsed < 0) {
     throw new Error(
       `Invalid CLAUDE_AUTO_RESUME_WAIT_BUFFER value: '${value}'. ` +
-      'Must be a non-negative integer (seconds). ' +
-      'Example: export CLAUDE_AUTO_RESUME_WAIT_BUFFER=30'
+        'Must be a non-negative integer (seconds). ' +
+        'Example: export CLAUDE_AUTO_RESUME_WAIT_BUFFER=30'
     );
   }
   return parsed;
@@ -57,8 +57,8 @@ function parseSkipPermissions(value: string | undefined): boolean {
     default:
       throw new Error(
         `Invalid CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS value: '${value}'. ` +
-        'Must be true/false, yes/no, 1/0, or on/off (case insensitive). ' +
-        'Example: export CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false'
+          'Must be true/false, yes/no, 1/0, or on/off (case insensitive). ' +
+          'Example: export CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false'
       );
   }
 }
@@ -70,11 +70,11 @@ function parseLogFile(value: string | undefined): string | undefined {
   if (!value || value.trim() === '') return undefined;
 
   const logPath = value.trim();
-  
+
   try {
     // Check if the directory exists and is writable
     const dir = path.dirname(logPath);
-    
+
     // Create directory if it doesn't exist
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -82,12 +82,12 @@ function parseLogFile(value: string | undefined): string | undefined {
 
     // Test if we can write to the location
     fs.accessSync(dir, fs.constants.W_OK);
-    
+
     return logPath;
   } catch (error) {
     throw new Error(
       `Invalid CLAUDE_AUTO_RESUME_LOG_FILE path: '${value}'. ` +
-      `Directory is not writable or cannot be created: ${error}`
+        `Directory is not writable or cannot be created: ${error}`
     );
   }
 }
@@ -96,7 +96,7 @@ function parseLogFile(value: string | undefined): string | undefined {
  * Loads configuration from environment variables and defaults
  * @param exitOnError - Whether to exit process on error (default: true)
  */
-export function loadConfiguration(exitOnError: boolean = true): CLIConfig {
+export function loadConfiguration(exitOnError = true): CLIConfig {
   try {
     const config: CLIConfig = {
       ...DEFAULT_CONFIG,
@@ -108,7 +108,7 @@ export function loadConfiguration(exitOnError: boolean = true): CLIConfig {
     // Perform runtime validation
     const { validateCLIConfig } = require('../utils/validators');
     const validation = validateCLIConfig(config);
-    
+
     if (!validation.valid) {
       throw new Error(`Configuration validation failed: ${validation.errors.join(', ')}`);
     }

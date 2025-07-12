@@ -24,22 +24,25 @@ export interface ConnectivityResult {
  */
 export class NetworkUtils {
   private static readonly PRIMARY_DNS_SERVERS = ['8.8.8.8', '1.1.1.1'];
-  private static readonly HTTPS_TEST_URLS = ['https://www.google.com', 'https://www.cloudflare.com'];
+  private static readonly HTTPS_TEST_URLS = [
+    'https://www.google.com',
+    'https://www.cloudflare.com',
+  ];
   private static readonly TIMEOUT_MS = 5000;
   private static readonly CONNECT_TIMEOUT_MS = 3000;
 
   /**
    * Ping-based connectivity check using system ping command
    */
-  static async checkConnectivityPing(host: string = '8.8.8.8'): Promise<ConnectivityResult> {
+  static async checkConnectivityPing(host = '8.8.8.8'): Promise<ConnectivityResult> {
     const startTime = Date.now();
-    
+
     return new Promise((resolve) => {
       const isWindows = process.platform === 'win32';
-      const pingArgs = isWindows 
-        ? ['-n', '1', '-w', '3000', host]  // Windows ping
-        : ['-c', '1', '-W', '3', host];    // Unix ping
-      
+      const pingArgs = isWindows
+        ? ['-n', '1', '-w', '3000', host] // Windows ping
+        : ['-c', '1', '-W', '3', host]; // Unix ping
+
       const child = spawn('ping', pingArgs, {
         stdio: ['ignore', 'pipe', 'pipe'],
         timeout: NetworkUtils.TIMEOUT_MS,
@@ -99,17 +102,21 @@ export class NetworkUtils {
   /**
    * HTTP-based connectivity check using curl
    */
-  static async checkConnectivityCurl(url: string = 'https://www.google.com'): Promise<ConnectivityResult> {
+  static async checkConnectivityCurl(url = 'https://www.google.com'): Promise<ConnectivityResult> {
     const startTime = Date.now();
-    
+
     return new Promise((resolve) => {
       const curlArgs = [
-        '-s',  // Silent mode
-        '--max-time', (NetworkUtils.TIMEOUT_MS / 1000).toString(),
-        '--connect-timeout', (NetworkUtils.CONNECT_TIMEOUT_MS / 1000).toString(),
-        '-o', '/dev/null',  // Discard output
-        '-w', '%{http_code}',  // Write HTTP response code
-        url
+        '-s', // Silent mode
+        '--max-time',
+        (NetworkUtils.TIMEOUT_MS / 1000).toString(),
+        '--connect-timeout',
+        (NetworkUtils.CONNECT_TIMEOUT_MS / 1000).toString(),
+        '-o',
+        '/dev/null', // Discard output
+        '-w',
+        '%{http_code}', // Write HTTP response code
+        url,
       ];
 
       const child = spawn('curl', curlArgs, {
@@ -131,7 +138,7 @@ export class NetworkUtils {
       child.on('close', (code) => {
         const responseTime = Date.now() - startTime;
         const httpCode = stdout.trim();
-        
+
         if (code === 0 && httpCode && parseInt(httpCode) < 400) {
           resolve({
             connected: true,
@@ -162,16 +169,17 @@ export class NetworkUtils {
   /**
    * HTTP-based connectivity check using wget
    */
-  static async checkConnectivityWget(url: string = 'https://www.google.com'): Promise<ConnectivityResult> {
+  static async checkConnectivityWget(url = 'https://www.google.com'): Promise<ConnectivityResult> {
     const startTime = Date.now();
-    
+
     return new Promise((resolve) => {
       const wgetArgs = [
-        '-q',  // Quiet mode
-        '--timeout=' + (NetworkUtils.TIMEOUT_MS / 1000),
+        '-q', // Quiet mode
+        '--timeout=' + NetworkUtils.TIMEOUT_MS / 1000,
         '--tries=1',
-        '-O', '/dev/null',  // Discard output
-        url
+        '-O',
+        '/dev/null', // Discard output
+        url,
       ];
 
       const child = spawn('wget', wgetArgs, {
@@ -187,7 +195,7 @@ export class NetworkUtils {
 
       child.on('close', (code) => {
         const responseTime = Date.now() - startTime;
-        
+
         if (code === 0) {
           resolve({
             connected: true,
@@ -256,7 +264,7 @@ export class NetworkUtils {
    */
   static async ensureConnectivity(): Promise<void> {
     const result = await NetworkUtils.checkConnectivity();
-    
+
     if (!result.connected) {
       throw new ClaudeAutoResumeError(
         'Network connectivity check failed',
@@ -278,9 +286,11 @@ export class NetworkUtils {
 
     while (Date.now() - startTime < maxWaitTime) {
       const result = await NetworkUtils.checkConnectivity();
-      
+
       if (result.connected) {
-        console.log(`[INFO] Network connectivity restored via ${result.method} (${result.responseTime}ms)`);
+        console.log(
+          `[INFO] Network connectivity restored via ${result.method} (${result.responseTime}ms)`
+        );
         return true;
       }
 
@@ -307,7 +317,7 @@ export class NetworkUtils {
     const [pingResult, curlResult, wgetResult] = await Promise.all([
       NetworkUtils.checkConnectivityPing(),
       NetworkUtils.checkConnectivityCurl(),
-      NetworkUtils.checkConnectivityWget()
+      NetworkUtils.checkConnectivityWget(),
     ]);
 
     return {

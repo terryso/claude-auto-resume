@@ -21,8 +21,15 @@ export async function setupCLI(program: Command): Promise<void> {
     .option('-p, --prompt <prompt>', 'Custom prompt to send to Claude (default: "continue")')
     .option('-c, --continue', 'Continue previous conversation instead of starting new session')
     .option('-e, --execute <command>', 'Execute custom command after usage limit wait period')
-    .option('--cmd <command>', 'Execute custom command after usage limit wait period (alias for -e)')
-    .option('--test-mode <seconds>', '[DEV] Simulate usage limit with specified wait time in seconds', parseInt)
+    .option(
+      '--cmd <command>',
+      'Execute custom command after usage limit wait period (alias for -e)'
+    )
+    .option(
+      '--test-mode <seconds>',
+      '[DEV] Simulate usage limit with specified wait time in seconds',
+      parseInt
+    )
     .option('--check', 'Show system check information')
     .argument('[prompt]', 'Custom prompt as positional argument')
     .addHelpText(
@@ -55,9 +62,11 @@ Use without installing:
 
         // Validate argument combinations
         if (options.execute && options.continue) {
-          logger.error('Cannot use both custom command execution (-e/--execute/--cmd) and continue flag (-c/--continue).');
+          logger.error(
+            'Cannot use both custom command execution (-e/--execute/--cmd) and continue flag (-c/--continue).'
+          );
           logger.error('These options are mutually exclusive.');
-          logger.error('Use \'claude-auto-resume --help\' to see usage examples.');
+          logger.error("Use 'claude-auto-resume --help' to see usage examples.");
           process.exit(1);
         }
 
@@ -69,7 +78,7 @@ Use without installing:
 
         if (typeof options.testMode === 'number' && options.testMode <= 0) {
           logger.error('Invalid test mode value. Must be a positive integer (seconds).');
-          logger.error('Example: claude-auto-resume --test-mode 10 -e \'echo test\'');
+          logger.error("Example: claude-auto-resume --test-mode 10 -e 'echo test'");
           process.exit(1);
         }
 
@@ -91,7 +100,7 @@ Use without installing:
         logger.info('Claude Auto Resume - TypeScript Version');
         logger.info(`Prompt: ${finalPrompt}`);
         logger.info(`Continue mode: ${options.continue ? 'enabled' : 'disabled'}`);
-        
+
         if (options.execute) {
           logger.info(`Custom command to execute: ${options.execute}`);
         }
@@ -130,20 +139,20 @@ Use without installing:
 async function showSystemCheck(): Promise<void> {
   logger.info('System Check Information:');
   logger.info('========================');
-  
+
   // Check Node.js version
   logger.info(`Node.js Version: ${process.version}`);
-  
+
   // Check platform
   logger.info(`Platform: ${process.platform}`);
   logger.info(`Architecture: ${process.arch}`);
-  
+
   // Check Claude CLI
   try {
     const { execSync } = require('child_process');
     const claudeVersion = execSync('claude --version', { encoding: 'utf8', timeout: 5000 }).trim();
     logger.info(`Claude CLI Version: ${claudeVersion}`);
-    
+
     // Check if --dangerously-skip-permissions is supported
     try {
       const claudeHelp = execSync('claude --help', { encoding: 'utf8', timeout: 5000 });
@@ -158,10 +167,16 @@ async function showSystemCheck(): Promise<void> {
   } catch (error) {
     logger.error(`Claude CLI: Not available or error occurred - ${error}`);
   }
-  
+
   // Check environment variables
   logger.info('Environment Variables:');
-  logger.info(`  CLAUDE_AUTO_RESUME_WAIT_BUFFER: ${process.env.CLAUDE_AUTO_RESUME_WAIT_BUFFER || 'Not set'}`);
-  logger.info(`  CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS: ${process.env.CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS || 'Not set'}`);
-  logger.info(`  CLAUDE_AUTO_RESUME_LOG_FILE: ${process.env.CLAUDE_AUTO_RESUME_LOG_FILE || 'Not set'}`);
+  logger.info(
+    `  CLAUDE_AUTO_RESUME_WAIT_BUFFER: ${process.env.CLAUDE_AUTO_RESUME_WAIT_BUFFER || 'Not set'}`
+  );
+  logger.info(
+    `  CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS: ${process.env.CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS || 'Not set'}`
+  );
+  logger.info(
+    `  CLAUDE_AUTO_RESUME_LOG_FILE: ${process.env.CLAUDE_AUTO_RESUME_LOG_FILE || 'Not set'}`
+  );
 }

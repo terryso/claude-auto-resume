@@ -48,7 +48,7 @@ export class CommandExecutor {
     // 5-second countdown
     for (let i = CommandExecutor.SECURITY_COUNTDOWN_SECONDS; i > 0; i--) {
       process.stdout.write(`\rExecuting in ${i} seconds...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
     process.stdout.write('\rExecuting command...\n');
   }
@@ -58,7 +58,7 @@ export class CommandExecutor {
    */
   static async executeCustomCommand(
     command: string,
-    showWarning: boolean = true,
+    showWarning = true,
     timeout: number = CommandExecutor.MAX_EXECUTION_TIME_MS
   ): Promise<CommandExecutionResult> {
     // Show security warning if enabled
@@ -69,7 +69,9 @@ export class CommandExecutor {
     const startTime = Date.now();
     console.log(`[INFO] Starting command execution: ${command}`);
     console.log(`[INFO] Start time: ${new Date().toLocaleString()}`);
-    console.log(`[INFO] Maximum execution time: ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`);
+    console.log(
+      `[INFO] Maximum execution time: ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`
+    );
 
     return new Promise((resolve) => {
       // Use shell to support complex commands with pipes and redirections
@@ -105,7 +107,9 @@ export class CommandExecutor {
 
         console.log(`\n[INFO] Command completed`);
         console.log(`[INFO] Exit code: ${exitCode}`);
-        console.log(`[INFO] Execution time: ${TimeUtils.formatDuration(Math.floor(executionTime / 1000))}`);
+        console.log(
+          `[INFO] Execution time: ${TimeUtils.formatDuration(Math.floor(executionTime / 1000))}`
+        );
         console.log(`[INFO] End time: ${new Date().toLocaleString()}`);
 
         if (timedOut) {
@@ -136,9 +140,11 @@ export class CommandExecutor {
       // Handle process errors
       child.on('error', (error) => {
         const executionTime = Date.now() - startTime;
-        
+
         console.log(`\n[ERROR] Command execution failed: ${error.message}`);
-        console.log(`[INFO] Execution time: ${TimeUtils.formatDuration(Math.floor(executionTime / 1000))}`);
+        console.log(
+          `[INFO] Execution time: ${TimeUtils.formatDuration(Math.floor(executionTime / 1000))}`
+        );
 
         resolve({
           exitCode: 1,
@@ -153,10 +159,12 @@ export class CommandExecutor {
       const timeoutHandle = setTimeout(() => {
         timedOut = true;
         child.kill('SIGTERM');
-        
-        console.log(`\n[WARNING] Command execution timed out after ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`);
+
+        console.log(
+          `\n[WARNING] Command execution timed out after ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`
+        );
         console.log('[INFO] Sending SIGTERM to process...');
-        
+
         // Force kill after additional 5 seconds
         setTimeout(() => {
           child.kill('SIGKILL');
@@ -206,9 +214,9 @@ export class CommandExecutor {
 
     for (const pattern of dangerousPatterns) {
       if (pattern.test(trimmedCommand)) {
-        return { 
-          valid: false, 
-          error: `Command contains potentially dangerous pattern: ${pattern.source}. Please review carefully.` 
+        return {
+          valid: false,
+          error: `Command contains potentially dangerous pattern: ${pattern.source}. Please review carefully.`,
         };
       }
     }
@@ -234,7 +242,7 @@ export class CommandExecutor {
     try {
       // Execute with security warning
       const result = await CommandExecutor.executeCustomCommand(command, true);
-      
+
       // Handle failures
       if (!result.success) {
         throw new ClaudeAutoResumeError(
@@ -250,7 +258,7 @@ export class CommandExecutor {
       if (error instanceof ClaudeAutoResumeError) {
         throw error;
       }
-      
+
       throw new ClaudeAutoResumeError(
         `Command execution error: ${error}`,
         1,

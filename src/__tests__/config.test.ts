@@ -116,7 +116,7 @@ describe('Configuration', () => {
     it('should handle invalid CLAUDE_AUTO_RESUME_LOG_FILE path', () => {
       // Set to a non-writable path
       process.env.CLAUDE_AUTO_RESUME_LOG_FILE = '/root/forbidden/test.log';
-      
+
       expect(() => {
         loadConfiguration(false);
       }).toThrow(/Invalid CLAUDE_AUTO_RESUME_LOG_FILE path/);
@@ -125,24 +125,24 @@ describe('Configuration', () => {
     it('should create directory for log file if it does not exist', () => {
       const fs = require('fs');
       const path = require('path');
-      
+
       // Use a temporary directory that we can safely create/delete
       const testDir = '/tmp/claude-test-dir-' + Date.now();
       const testLogFile = path.join(testDir, 'test.log');
-      
+
       // Ensure directory doesn't exist initially
       if (fs.existsSync(testDir)) {
         fs.rmSync(testDir, { recursive: true, force: true });
       }
-      
+
       process.env.CLAUDE_AUTO_RESUME_LOG_FILE = testLogFile;
-      
+
       const config = loadConfiguration();
       expect(config.logFile).toBe(testLogFile);
-      
+
       // Check that directory was created
       expect(fs.existsSync(testDir)).toBe(true);
-      
+
       // Cleanup
       fs.rmSync(testDir, { recursive: true, force: true });
     });
@@ -151,7 +151,7 @@ describe('Configuration', () => {
       // Test empty values
       process.env.CLAUDE_AUTO_RESUME_WAIT_BUFFER = '';
       process.env.CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS = '';
-      
+
       const config = loadConfiguration();
       expect(config.waitBuffer).toBe(0); // Default value
       expect(config.skipPermissions).toBe(true); // Default value

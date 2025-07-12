@@ -108,7 +108,11 @@ export function validateCLIConfig(config: CLIConfig): { valid: boolean; errors: 
   }
 
   // Validate maxRetries
-  if (typeof config.maxRetries !== 'number' || config.maxRetries < 0 || !Number.isInteger(config.maxRetries)) {
+  if (
+    typeof config.maxRetries !== 'number' ||
+    config.maxRetries < 0 ||
+    !Number.isInteger(config.maxRetries)
+  ) {
     errors.push('maxRetries must be a non-negative integer');
   }
 
@@ -118,7 +122,11 @@ export function validateCLIConfig(config: CLIConfig): { valid: boolean; errors: 
   }
 
   // Validate waitBuffer
-  if (typeof config.waitBuffer !== 'number' || config.waitBuffer < 0 || !Number.isInteger(config.waitBuffer)) {
+  if (
+    typeof config.waitBuffer !== 'number' ||
+    config.waitBuffer < 0 ||
+    !Number.isInteger(config.waitBuffer)
+  ) {
     errors.push('waitBuffer must be a non-negative integer');
   }
 
@@ -175,7 +183,11 @@ export function validateCLIOptions(options: CLIOptions): { valid: boolean; error
 
   // Validate testMode (optional)
   if (options.testMode !== undefined) {
-    if (typeof options.testMode !== 'number' || options.testMode <= 0 || !Number.isInteger(options.testMode)) {
+    if (
+      typeof options.testMode !== 'number' ||
+      options.testMode <= 0 ||
+      !Number.isInteger(options.testMode)
+    ) {
       errors.push('testMode must be a positive integer');
     }
   }
@@ -204,10 +216,13 @@ export function validateCLIOptions(options: CLIOptions): { valid: boolean; error
  */
 export function validateFilePath(filePath: string, mode: 'read' | 'write' | 'execute'): boolean {
   try {
-    const accessMode = mode === 'read' ? fs.constants.R_OK 
-                     : mode === 'write' ? fs.constants.W_OK 
-                     : fs.constants.X_OK;
-    
+    const accessMode =
+      mode === 'read'
+        ? fs.constants.R_OK
+        : mode === 'write'
+          ? fs.constants.W_OK
+          : fs.constants.X_OK;
+
     fs.accessSync(filePath, accessMode);
     return true;
   } catch {
@@ -224,7 +239,7 @@ export function validateWritableDirectory(dirPath: string): boolean {
     if (!stats.isDirectory()) {
       return false;
     }
-    
+
     fs.accessSync(dirPath, fs.constants.W_OK);
     return true;
   } catch {
@@ -251,10 +266,10 @@ export function validateConfigurationPrecedence(
   const relevantEnvVars = [
     'CLAUDE_AUTO_RESUME_WAIT_BUFFER',
     'CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS',
-    'CLAUDE_AUTO_RESUME_LOG_FILE'
+    'CLAUDE_AUTO_RESUME_LOG_FILE',
   ];
-  
-  if (relevantEnvVars.some(envVar => envVars[envVar] !== undefined)) {
+
+  if (relevantEnvVars.some((envVar) => envVars[envVar] !== undefined)) {
     precedenceOrder.push('Environment variables');
   }
 

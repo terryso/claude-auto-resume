@@ -36,15 +36,15 @@ export class ClaudeAutoResumeError extends Error {
    */
   getFormattedMessage(): string {
     let formatted = `[ERROR] ${this.message}`;
-    
+
     if (this.context) {
       formatted += `\n[DEBUG] ${this.context}`;
     }
-    
+
     if (this.hint) {
       formatted += `\n[HINT] ${this.hint}`;
     }
-    
+
     return formatted;
   }
 }

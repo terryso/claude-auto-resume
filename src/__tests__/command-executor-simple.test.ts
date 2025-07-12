@@ -12,7 +12,7 @@ jest.mock('../utils/logger');
 describe('CommandExecutor Simple', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Mock console methods to prevent output during tests
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'warn').mockImplementation();
@@ -31,10 +31,10 @@ describe('CommandExecutor Simple', () => {
         'npm test',
         'git status',
         'ls -la',
-        'cat package.json'
+        'cat package.json',
       ];
 
-      validCommands.forEach(cmd => {
+      validCommands.forEach((cmd) => {
         const result = CommandExecutor.validateCommand(cmd);
         expect(result.valid).toBe(true);
         expect(result.error).toBeUndefined();
@@ -43,14 +43,9 @@ describe('CommandExecutor Simple', () => {
 
     it('should reject empty or invalid commands', () => {
       // Non-string inputs and empty string
-      const invalidCommands = [
-        null as any,
-        undefined as any,
-        123 as any,
-        ''
-      ];
+      const invalidCommands = [null as any, undefined as any, 123 as any, ''];
 
-      invalidCommands.forEach(cmd => {
+      invalidCommands.forEach((cmd) => {
         const result = CommandExecutor.validateCommand(cmd);
         expect(result.valid).toBe(false);
         expect(result.error).toContain('non-empty string');
@@ -58,7 +53,7 @@ describe('CommandExecutor Simple', () => {
 
       // Whitespace-only commands
       const whitespaceCommands = ['   ', '\t', '\n'];
-      whitespaceCommands.forEach(cmd => {
+      whitespaceCommands.forEach((cmd) => {
         const result = CommandExecutor.validateCommand(cmd);
         expect(result.valid).toBe(false);
         expect(result.error).toContain('empty or whitespace');
@@ -67,13 +62,13 @@ describe('CommandExecutor Simple', () => {
 
     it('should detect dangerous patterns', () => {
       const dangerousCommands = [
-        'rm -rf /',          // Matches /rm\s+-rf\s+\//
-        'mkfs /dev/sda1',    // Matches /mkfs/
-        'dd if=/dev/zero of=/dev/sda',  // Matches /dd\s+if=.*of=\/dev/
-        ':(){ :|:& }',       // Matches fork bomb pattern
+        'rm -rf /', // Matches /rm\s+-rf\s+\//
+        'mkfs /dev/sda1', // Matches /mkfs/
+        'dd if=/dev/zero of=/dev/sda', // Matches /dd\s+if=.*of=\/dev/
+        ':(){ :|:& }', // Matches fork bomb pattern
       ];
 
-      dangerousCommands.forEach(cmd => {
+      dangerousCommands.forEach((cmd) => {
         const result = CommandExecutor.validateCommand(cmd);
         expect(result.valid).toBe(false);
         expect(result.error).toContain('potentially dangerous pattern');
@@ -81,14 +76,9 @@ describe('CommandExecutor Simple', () => {
     });
 
     it('should allow obviously safe commands', () => {
-      const safeCommands = [
-        'echo hello',
-        'ls',
-        'pwd',
-        'npm test',
-      ];
+      const safeCommands = ['echo hello', 'ls', 'pwd', 'npm test'];
 
-      safeCommands.forEach(cmd => {
+      safeCommands.forEach((cmd) => {
         const result = CommandExecutor.validateCommand(cmd);
         expect(result.valid).toBe(true);
         expect(result.error).toBeUndefined();
@@ -110,17 +100,17 @@ describe('CommandExecutor Simple', () => {
 
   describe('executeWithSafeguards', () => {
     it('should reject invalid commands without execution', async () => {
-      await expect(
-        CommandExecutor.executeWithSafeguards('')
-      ).rejects.toThrow(ClaudeAutoResumeError);
+      await expect(CommandExecutor.executeWithSafeguards('')).rejects.toThrow(
+        ClaudeAutoResumeError
+      );
 
-      await expect(
-        CommandExecutor.executeWithSafeguards('rm -rf /')
-      ).rejects.toThrow(ClaudeAutoResumeError);
+      await expect(CommandExecutor.executeWithSafeguards('rm -rf /')).rejects.toThrow(
+        ClaudeAutoResumeError
+      );
 
-      await expect(
-        CommandExecutor.executeWithSafeguards(null as any)
-      ).rejects.toThrow(ClaudeAutoResumeError);
+      await expect(CommandExecutor.executeWithSafeguards(null as any)).rejects.toThrow(
+        ClaudeAutoResumeError
+      );
     });
   });
 
@@ -155,14 +145,14 @@ describe('CommandExecutor Simple', () => {
     it('should handle edge cases in command validation', () => {
       // Test various edge cases
       const edgeCases = [
-        'a',  // Single character
-        'echo test && echo done',  // Multiple commands
-        'echo "hello world"',  // Quoted strings
-        'ls /usr/local/bin',  // Path with slashes
-        'grep -r "pattern" .',  // Complex grep
+        'a', // Single character
+        'echo test && echo done', // Multiple commands
+        'echo "hello world"', // Quoted strings
+        'ls /usr/local/bin', // Path with slashes
+        'grep -r "pattern" .', // Complex grep
       ];
 
-      edgeCases.forEach(cmd => {
+      edgeCases.forEach((cmd) => {
         const result = CommandExecutor.validateCommand(cmd);
         expect(typeof result.valid).toBe('boolean');
         if (result.error) {
@@ -184,6 +174,104 @@ describe('CommandExecutor Simple', () => {
     it('should have CommandExecutor class available', () => {
       expect(CommandExecutor).toBeDefined();
       expect(typeof CommandExecutor).toBe('function');
+    });
+  });
+
+  describe('enhanced coverage tests', () => {
+    // Mock child_process to test execution paths without actual execution
+    const mockSpawn = jest.fn();
+
+    beforeEach(() => {
+      // Reset spawn mock
+      (require('child_process') as any).spawn = mockSpawn;
+    });
+
+    it('should handle showSecurityWarning countdown', async () => {
+      const originalSetTimeout = global.setTimeout;
+      const setTimeoutSpy = jest.fn((callback, delay) => {
+        // Immediately call callback for testing
+        callback();
+        return 123 as any;
+      });
+      global.setTimeout = setTimeoutSpy as any;
+
+      await CommandExecutor.showSecurityWarning('test command');
+
+      // Should have been called 5 times for countdown
+      expect(setTimeoutSpy).toHaveBeenCalledTimes(5);
+
+      global.setTimeout = originalSetTimeout;
+    });
+
+    it('should create proper spawn arguments', () => {
+      // Create a mock child process that doesn't hang
+      const mockChild = {
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        on: jest.fn((event, callback) => {
+          if (event === 'close') {
+            // Immediately call close callback with exit code 0
+            setTimeout(() => callback(0), 10);
+          }
+        }),
+        kill: jest.fn(),
+      };
+
+      mockSpawn.mockReturnValue(mockChild);
+
+      // Test that spawn is called with correct arguments
+      const command = 'echo test';
+      CommandExecutor.executeCustomCommand(command, false, 1000);
+
+      expect(mockSpawn).toHaveBeenCalledWith('sh', ['-c', command], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 1000,
+      });
+    });
+
+    it('should validate constants are defined', () => {
+      // Test that the class has the expected constants
+      expect(CommandExecutor['SECURITY_COUNTDOWN_SECONDS']).toBe(5);
+      expect(CommandExecutor['MAX_EXECUTION_TIME_MS']).toBe(300000);
+    });
+
+    it('should handle error cases in executeWithSafeguards', async () => {
+      // Test that validation errors are properly wrapped
+      const error = await CommandExecutor.executeWithSafeguards('').catch((e) => e);
+      expect(error).toBeInstanceOf(ClaudeAutoResumeError);
+      expect(error.message).toContain('Command validation failed');
+    });
+
+    it('should validate dangerous pattern variations', () => {
+      const dangerousCommands = [
+        'rm -rf /',
+        'rm  -rf  /', // Extra spaces
+        'mkfs.ext4',
+        'dd if=/dev/zero of=/dev/sda1',
+        ':(){:|:&};', // Fork bomb variation
+      ];
+
+      dangerousCommands.forEach((cmd) => {
+        const result = CommandExecutor.validateCommand(cmd);
+        expect(result.valid).toBe(false);
+        expect(result.error).toBeDefined();
+      });
+    });
+
+    it('should handle command validation edge cases', () => {
+      // Test trimming behavior
+      const result1 = CommandExecutor.validateCommand('  echo test  ');
+      expect(result1.valid).toBe(true);
+
+      // Test various input types
+      const result2 = CommandExecutor.validateCommand(null as any);
+      expect(result2.valid).toBe(false);
+
+      const result3 = CommandExecutor.validateCommand(undefined as any);
+      expect(result3.valid).toBe(false);
+
+      const result4 = CommandExecutor.validateCommand(123 as any);
+      expect(result4.valid).toBe(false);
     });
   });
 });

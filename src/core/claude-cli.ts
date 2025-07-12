@@ -30,7 +30,7 @@ export class ClaudeCLI {
    * @param args - Command line arguments
    * @param timeoutMs - Timeout in milliseconds (default: 30000)
    */
-  async executeClaudeCommand(args: string[], timeoutMs: number = 30000): Promise<string> {
+  async executeClaudeCommand(args: string[], timeoutMs = 30000): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn(this.cliPath, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -52,38 +52,46 @@ export class ClaudeCLI {
         if (code === 0) {
           resolve(stdout);
         } else {
-          reject(new ClaudeAutoResumeError(
-            `Claude CLI execution failed with exit code ${code}`,
-            1,
-            `Command: ${this.cliPath} ${args.join(' ')}\nStderr: ${stderr}`
-          ));
+          reject(
+            new ClaudeAutoResumeError(
+              `Claude CLI execution failed with exit code ${code}`,
+              1,
+              `Command: ${this.cliPath} ${args.join(' ')}\nStderr: ${stderr}`
+            )
+          );
         }
       });
 
       child.on('error', (error) => {
         if (error.message.includes('ENOENT')) {
-          reject(new ClaudeAutoResumeError(
-            'Claude CLI not found in PATH',
-            1,
-            `Make sure Claude CLI is installed and available in PATH. Command: ${this.cliPath}`
-          ));
+          reject(
+            new ClaudeAutoResumeError(
+              'Claude CLI not found in PATH',
+              1,
+              `Make sure Claude CLI is installed and available in PATH. Command: ${this.cliPath}`
+            )
+          );
         } else {
-          reject(new ClaudeAutoResumeError(
-            `Claude CLI execution error: ${error.message}`,
-            1,
-            `Command: ${this.cliPath} ${args.join(' ')}`
-          ));
+          reject(
+            new ClaudeAutoResumeError(
+              `Claude CLI execution error: ${error.message}`,
+              1,
+              `Command: ${this.cliPath} ${args.join(' ')}`
+            )
+          );
         }
       });
 
       // Handle timeout
       const timeoutHandle = setTimeout(() => {
         child.kill('SIGTERM');
-        reject(new ClaudeAutoResumeError(
-          `Claude CLI command timed out after ${timeoutMs}ms`,
-          1,
-          `Command: ${this.cliPath} ${args.join(' ')}`
-        ));
+        reject(
+          new ClaudeAutoResumeError(
+            `Claude CLI command timed out after ${timeoutMs}ms`,
+            1,
+            `Command: ${this.cliPath} ${args.join(' ')}`
+          )
+        );
       }, timeoutMs);
 
       child.on('close', () => {
@@ -112,18 +120,18 @@ export class ClaudeCLI {
 
     if (match && match[1]) {
       const timestampStr = match[1].trim();
-      
+
       try {
         // Parse timestamp - handle different formats
         let timestamp: number;
-        
+
         // Try parsing as ISO string first
         if (timestampStr.includes('T')) {
           timestamp = new Date(timestampStr).getTime() / 1000;
         } else {
           // Try parsing as Unix timestamp
           timestamp = parseInt(timestampStr, 10);
-          
+
           // If it looks like milliseconds, convert to seconds
           if (timestamp > 1e12) {
             timestamp = Math.floor(timestamp / 1000);
@@ -194,7 +202,7 @@ export class ClaudeCLI {
    */
   async resume(prompt: string, continueMode = false, skipPermissions = true): Promise<void> {
     const args = this.buildClaudeCommand(prompt, continueMode, skipPermissions);
-    
+
     try {
       await this.executeClaudeCommand(args);
     } catch (error) {
