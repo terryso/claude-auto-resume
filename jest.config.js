@@ -33,5 +33,6 @@ module.exports = {
   // Prevent test hanging and reduce noise from expected timeouts
   forceExit: true,
   detectOpenHandles: true,  // Re-enable to help identify real issues
-  silent: false
+  silent: true,  // Suppress console output during tests
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js']
 };

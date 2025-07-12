@@ -114,15 +114,66 @@ describe('CommandExecutor Simple', () => {
     });
   });
 
-  describe('additional coverage tests', () => {
-    it('should have showSecurityWarning method', () => {
+  describe('showSecurityWarning method', () => {
+    it('should be a function', () => {
       expect(typeof CommandExecutor.showSecurityWarning).toBe('function');
     });
+  });
 
-    it('should have executeCustomCommand method', () => {
-      expect(typeof CommandExecutor.executeCustomCommand).toBe('function');
+  describe('executeCustomCommand timeout handling', () => {
+    it('should handle different timeout values', async () => {
+      const { spawn } = require('child_process');
+      const mockChild = {
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        on: jest.fn((event, callback) => {
+          if (event === 'close') {
+            // Simulate successful completion
+            callback(0);
+          }
+        }),
+        kill: jest.fn(),
+      };
+
+      spawn.mockReturnValue(mockChild);
+
+      // Test different timeout scenarios
+      const result = await CommandExecutor.executeCustomCommand('echo test', false, 1000);
+      expect(result.success).toBe(true);
+      expect(result.exitCode).toBe(0);
     });
 
+    it('should handle command timeout', async () => {
+      const { spawn } = require('child_process');
+      const mockChild = {
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        on: jest.fn((event, callback) => {
+          // Don't call the close callback to simulate hanging
+        }),
+        kill: jest.fn(),
+      };
+
+      spawn.mockReturnValue(mockChild);
+
+      // Use a very short timeout to trigger timeout handling
+      const promise = CommandExecutor.executeCustomCommand('sleep 10', false, 100);
+      
+      // Fast-forward time to trigger timeout
+      setTimeout(() => {
+        // Simulate timeout by calling error handler
+        const onHandlers = mockChild.on.mock.calls.find(call => call[0] === 'error');
+        if (onHandlers) {
+          onHandlers[1](new Error('Command timed out'));
+        }
+      }, 50);
+
+      const result = await promise;
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('command validation edge cases', () => {
     it('should handle various command patterns', () => {
       // Test more command patterns to increase coverage
       const testCases = [
