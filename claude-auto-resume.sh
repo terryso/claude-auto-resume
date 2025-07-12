@@ -6,6 +6,71 @@
 # Version information
 VERSION="1.3.0"
 
+# Environment variable configuration with defaults
+WAIT_BUFFER=0                    # Extra wait time in seconds (default: 0)
+SKIP_PERMISSIONS=true            # Control permission skipping (default: true)
+LOG_FILE=""                      # Optional log file path (default: empty/no logging)
+
+# Function to validate and read environment variables
+read_environment_variables() {
+    # Read CLAUDE_AUTO_RESUME_WAIT_BUFFER (default: 0 seconds)
+    if [ -n "$CLAUDE_AUTO_RESUME_WAIT_BUFFER" ]; then
+        if [[ "$CLAUDE_AUTO_RESUME_WAIT_BUFFER" =~ ^[0-9]+$ ]] && [ "$CLAUDE_AUTO_RESUME_WAIT_BUFFER" -ge 0 ]; then
+            WAIT_BUFFER="$CLAUDE_AUTO_RESUME_WAIT_BUFFER"
+        else
+            echo "[ERROR] Invalid CLAUDE_AUTO_RESUME_WAIT_BUFFER value: '$CLAUDE_AUTO_RESUME_WAIT_BUFFER'"
+            echo "[HINT] Must be a non-negative integer (seconds)."
+            echo "[SUGGESTION] Example: export CLAUDE_AUTO_RESUME_WAIT_BUFFER=30"
+            exit 1
+        fi
+    fi
+    
+    
+    # Read CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS (default: true)
+    if [ -n "$CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS" ]; then
+        # Convert to lowercase using tr for compatibility
+        SKIP_PERMISSIONS_LOWER=$(echo "$CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS" | tr '[:upper:]' '[:lower:]')
+        case "$SKIP_PERMISSIONS_LOWER" in
+            true|yes|1|on)
+                SKIP_PERMISSIONS=true
+                ;;
+            false|no|0|off)
+                SKIP_PERMISSIONS=false
+                ;;
+            *)
+                echo "[ERROR] Invalid CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS value: '$CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS'"
+                echo "[HINT] Must be true/false, yes/no, 1/0, or on/off (case insensitive)."
+                echo "[SUGGESTION] Example: export CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false"
+                exit 1
+                ;;
+        esac
+    fi
+    
+    # Read CLAUDE_AUTO_RESUME_LOG_FILE (default: empty/no logging)
+    if [ -n "$CLAUDE_AUTO_RESUME_LOG_FILE" ]; then
+        # Check if the directory is writable (create directory if it doesn't exist)
+        LOG_DIR=$(dirname "$CLAUDE_AUTO_RESUME_LOG_FILE")
+        if [ ! -d "$LOG_DIR" ]; then
+            if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
+                echo "[ERROR] Cannot create directory for log file: '$LOG_DIR'"
+                echo "[HINT] Check directory permissions and path validity."
+                echo "[SUGGESTION] Ensure the parent directory exists and is writable."
+                exit 1
+            fi
+        fi
+        
+        # Test if the log file location is writable
+        if ! touch "$CLAUDE_AUTO_RESUME_LOG_FILE" 2>/dev/null; then
+            echo "[ERROR] Cannot write to log file: '$CLAUDE_AUTO_RESUME_LOG_FILE'"
+            echo "[HINT] Check file permissions and path validity."
+            echo "[SUGGESTION] Ensure the directory exists and is writable."
+            exit 1
+        fi
+        
+        LOG_FILE="$CLAUDE_AUTO_RESUME_LOG_FILE"
+    fi
+}
+
 # Default prompt to use when resuming
 DEFAULT_PROMPT="continue"
 # Default is to start new session (no -c flag)
@@ -88,6 +153,9 @@ cleanup_resources() {
 # Set up signal handlers for graceful cleanup
 trap cleanup_on_exit EXIT
 trap interrupt_handler INT TERM
+
+# Read and validate environment variables
+read_environment_variables
 
 # Function to execute custom commands with proper error handling
 execute_custom_command() {
@@ -205,7 +273,18 @@ EXAMPLES:
     claude-auto-resume --cmd "python app.py"  # Executes after usage limit wait
     claude-auto-resume --test-mode 10 -e "echo test"  # [DEV] Test with 10s wait
 
-⚠️  Uses --dangerously-skip-permissions. Use only in trusted environments.
+ENVIRONMENT VARIABLES:
+    CLAUDE_AUTO_RESUME_WAIT_BUFFER     Extra wait time in seconds (default: 0)
+    CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS Control permission skipping (default: true)
+    CLAUDE_AUTO_RESUME_LOG_FILE        Optional log file path (default: no logging)
+
+EXAMPLES (Environment Variables):
+    export CLAUDE_AUTO_RESUME_WAIT_BUFFER=30      # Add 30 seconds buffer
+    export CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false  # Enable permission prompts
+    export CLAUDE_AUTO_RESUME_LOG_FILE=/tmp/claude.log  # Enable logging
+
+⚠️  Default: Uses --dangerously-skip-permissions. Use only in trusted environments.
+⚠️  Set CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false to enable permission prompts.
 ⚠️  Custom command execution allows arbitrary shell commands. Use with caution.
 
 EOF
@@ -322,6 +401,37 @@ while [[ $# -gt 0 ]]; do
                 echo "✓ Connected"
             else
                 echo "✗ Failed"
+            fi
+            echo ""
+            
+            # Environment Variables Configuration
+            echo "Environment Variables Configuration:"
+            echo "  CLAUDE_AUTO_RESUME_WAIT_BUFFER:"
+            if [ -n "$CLAUDE_AUTO_RESUME_WAIT_BUFFER" ]; then
+                echo "    Value: $WAIT_BUFFER seconds (from environment variable)"
+                echo "    Source: CLAUDE_AUTO_RESUME_WAIT_BUFFER=$CLAUDE_AUTO_RESUME_WAIT_BUFFER"
+            else
+                echo "    Value: $WAIT_BUFFER seconds (default)"
+                echo "    Source: Default value"
+            fi
+            
+            
+            echo "  CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS:"
+            if [ -n "$CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS" ]; then
+                echo "    Value: $SKIP_PERMISSIONS (from environment variable)"
+                echo "    Source: CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=$CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS"
+            else
+                echo "    Value: $SKIP_PERMISSIONS (default)"
+                echo "    Source: Default value"
+            fi
+            
+            echo "  CLAUDE_AUTO_RESUME_LOG_FILE:"
+            if [ -n "$CLAUDE_AUTO_RESUME_LOG_FILE" ]; then
+                echo "    Value: $LOG_FILE (from environment variable)"
+                echo "    Source: CLAUDE_AUTO_RESUME_LOG_FILE=$CLAUDE_AUTO_RESUME_LOG_FILE"
+            else
+                echo "    Value: (no logging) (default)"
+                echo "    Source: Default value"
             fi
             
             exit 0
@@ -442,6 +552,16 @@ if [ -n "$LIMIT_MSG" ]; then
     NOW_TIMESTAMP=$(date +%s)
     WAIT_SECONDS=$((RESUME_TIMESTAMP - NOW_TIMESTAMP))
   fi
+  
+  # Apply environment variable configurations
+  if [ $WAIT_SECONDS -gt 0 ]; then
+    # Apply WAIT_BUFFER (additional wait time)
+    if [ "$WAIT_BUFFER" -gt 0 ]; then
+      echo "[CONFIG] Adding wait buffer of $WAIT_BUFFER seconds..."
+      WAIT_SECONDS=$((WAIT_SECONDS + WAIT_BUFFER))
+    fi
+  fi
+  
   if [ $WAIT_SECONDS -le 0 ]; then
     echo "Resume time has arrived. Retrying now."
   else
@@ -503,19 +623,32 @@ if [ -n "$LIMIT_MSG" ]; then
     fi
     echo "Custom command has been executed successfully."
   else
+    # Build Claude command with conditional permission skipping
+    CLAUDE_CMD="claude"
+    if [ "$USE_CONTINUE_FLAG" = true ]; then
+      CLAUDE_CMD="$CLAUDE_CMD -c"
+    fi
+    if [ "$SKIP_PERMISSIONS" = true ]; then
+      CLAUDE_CMD="$CLAUDE_CMD --dangerously-skip-permissions"
+    fi
+    CLAUDE_CMD="$CLAUDE_CMD -p \"$CUSTOM_PROMPT\""
+    
     if [ "$USE_CONTINUE_FLAG" = true ]; then
       echo "Automatically continuing previous Claude conversation with prompt: '$CUSTOM_PROMPT'"
-      CLAUDE_PID=""
-      CLAUDE_OUTPUT2=$(claude -c --dangerously-skip-permissions -p "$CUSTOM_PROMPT" 2>&1)
-      RET_CODE2=$?
-      CLAUDE_PID=""
+      if [ "$SKIP_PERMISSIONS" = false ]; then
+        echo "[CONFIG] Permission prompts enabled (SKIP_PERMISSIONS=false)"
+      fi
     else
       echo "Automatically starting new Claude session with prompt: '$CUSTOM_PROMPT'"
-      CLAUDE_PID=""
-      CLAUDE_OUTPUT2=$(claude --dangerously-skip-permissions -p "$CUSTOM_PROMPT" 2>&1)
-      RET_CODE2=$?
-      CLAUDE_PID=""
+      if [ "$SKIP_PERMISSIONS" = false ]; then
+        echo "[CONFIG] Permission prompts enabled (SKIP_PERMISSIONS=false)"
+      fi
     fi
+    
+    CLAUDE_PID=""
+    CLAUDE_OUTPUT2=$(eval "$CLAUDE_CMD" 2>&1)
+    RET_CODE2=$?
+    CLAUDE_PID=""
     
     if [ $RET_CODE2 -ne 0 ]; then
       echo "[ERROR] Claude CLI failed after resume."
