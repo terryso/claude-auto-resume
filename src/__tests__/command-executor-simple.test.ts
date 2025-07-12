@@ -211,7 +211,7 @@ describe('CommandExecutor Simple', () => {
         on: jest.fn((event, callback) => {
           if (event === 'close') {
             // Immediately call close callback with exit code 0
-            setTimeout(() => callback(0), 10);
+            process.nextTick(() => callback(0));
           }
         }),
         kill: jest.fn(),

@@ -119,7 +119,7 @@ describe('NetworkUtils Simple', () => {
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 10);
+              process.nextTick(() => callback(0));
             }
           }),
           kill: jest.fn(),
@@ -146,7 +146,7 @@ describe('NetworkUtils Simple', () => {
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 10);
+              process.nextTick(() => callback(0));
             }
           }),
           kill: jest.fn(),
@@ -179,7 +179,7 @@ describe('NetworkUtils Simple', () => {
           },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(1), 10);
+              process.nextTick(() => callback(1));
             }
           }),
           kill: jest.fn(),
@@ -199,7 +199,7 @@ describe('NetworkUtils Simple', () => {
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'error') {
-              setTimeout(() => callback(new Error('Command not found')), 10);
+              process.nextTick(() => callback(new Error('Command not found')));
             }
           }),
           kill: jest.fn(),
@@ -227,7 +227,7 @@ describe('NetworkUtils Simple', () => {
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 10);
+              process.nextTick(() => callback(0));
             }
           }),
           kill: jest.fn(),
@@ -263,7 +263,7 @@ describe('NetworkUtils Simple', () => {
           },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(1), 10);
+              process.nextTick(() => callback(1));
             }
           }),
           kill: jest.fn(),
@@ -305,7 +305,7 @@ describe('NetworkUtils Simple', () => {
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 10);
+              process.nextTick(() => callback(0));
             }
           }),
           kill: jest.fn(),
@@ -335,7 +335,7 @@ describe('NetworkUtils Simple', () => {
           },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(1), 10);
+              process.nextTick(() => callback(1));
             }
           }),
           kill: jest.fn(),

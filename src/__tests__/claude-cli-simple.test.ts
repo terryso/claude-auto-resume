@@ -186,7 +186,7 @@ describe('ClaudeCLI Simple', () => {
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 10);
+              process.nextTick(() => callback(0));
             }
           }),
           kill: jest.fn(),
@@ -212,7 +212,7 @@ describe('ClaudeCLI Simple', () => {
           },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(1), 10);
+              process.nextTick(() => callback(1));
             }
           }),
           kill: jest.fn(),
@@ -233,7 +233,7 @@ describe('ClaudeCLI Simple', () => {
             if (event === 'error') {
               const error = new Error('spawn claude ENOENT');
               error.message = 'spawn claude ENOENT';
-              setTimeout(() => callback(error), 10);
+              process.nextTick(() => callback(error));
             }
           }),
           kill: jest.fn(),
@@ -252,7 +252,7 @@ describe('ClaudeCLI Simple', () => {
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'error') {
-              setTimeout(() => callback(new Error('Generic error')), 10);
+              process.nextTick(() => callback(new Error('Generic error')));
             }
           }),
           kill: jest.fn(),
@@ -463,7 +463,7 @@ describe('ClaudeCLI Simple', () => {
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 10);
+              process.nextTick(() => callback(0));
             }
           }),
           kill: jest.fn(),
@@ -491,7 +491,7 @@ describe('ClaudeCLI Simple', () => {
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 10);
+              process.nextTick(() => callback(0));
             }
           }),
           kill: jest.fn(),
@@ -516,7 +516,7 @@ describe('ClaudeCLI Simple', () => {
           },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              setTimeout(() => callback(1), 10);
+              process.nextTick(() => callback(1));
             }
           }),
           kill: jest.fn(),
