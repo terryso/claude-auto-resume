@@ -18,9 +18,14 @@ import { main } from '../index';
 describe('CLI Main', () => {
   let mockProgram: jest.Mocked<Command>;
   let mockSetupCLI: jest.Mock;
+  let originalArgv: string[];
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Save original argv and set to minimal test values to avoid commander parsing issues
+    originalArgv = process.argv;
+    process.argv = ['node', 'test'];
 
     // Mock program instance methods
     mockProgram = {
@@ -31,9 +36,15 @@ describe('CLI Main', () => {
     const { setupCLI } = require('../cli/commands');
     mockSetupCLI = setupCLI;
     mockSetupCLI.mockResolvedValue(undefined);
+
+    // Mock console methods to reduce noise
+    jest.spyOn(console, 'log').mockImplementation();
+    jest.spyOn(console, 'error').mockImplementation();
   });
 
   afterEach(() => {
+    // Restore original argv
+    process.argv = originalArgv;
     jest.restoreAllMocks();
   });
 
@@ -65,6 +76,8 @@ describe('CLI Main', () => {
   it('should handle parse errors', async () => {
     const { program } = require('commander');
     const error = new Error('Parse failed');
+    
+    // Mock parseAsync to reject with error
     program.parseAsync.mockRejectedValue(error);
 
     // Mock process.exit
@@ -72,7 +85,7 @@ describe('CLI Main', () => {
       throw new Error('Process exit called');
     });
 
-    await expect(main()).rejects.toThrow();
+    await expect(main()).rejects.toThrow('Process exit called');
 
     processExitSpy.mockRestore();
   });

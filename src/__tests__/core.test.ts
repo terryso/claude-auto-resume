@@ -10,12 +10,22 @@ jest.mock('child_process', () => ({
 }));
 
 describe('Core Module', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Mock console methods to prevent test output
+    jest.spyOn(console, 'log').mockImplementation();
+    jest.spyOn(console, 'error').mockImplementation();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   describe('ClaudeCLI', () => {
     let claudeCli: ClaudeCLI;
 
     beforeEach(() => {
       claudeCli = new ClaudeCLI();
-      jest.clearAllMocks();
     });
 
     it('should initialize with default CLI path', () => {

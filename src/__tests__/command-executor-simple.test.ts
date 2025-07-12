@@ -203,7 +203,7 @@ describe('CommandExecutor Simple', () => {
       global.setTimeout = originalSetTimeout;
     });
 
-    it('should create proper spawn arguments', () => {
+    it('should create proper spawn arguments', async () => {
       // Create a mock child process that doesn't hang
       const mockChild = {
         stdout: { on: jest.fn() },
@@ -221,7 +221,8 @@ describe('CommandExecutor Simple', () => {
 
       // Test that spawn is called with correct arguments
       const command = 'echo test';
-      CommandExecutor.executeCustomCommand(command, false, 1000);
+      // Await the command to prevent log output after tests complete
+      await CommandExecutor.executeCustomCommand(command, false, 1000);
 
       expect(mockSpawn).toHaveBeenCalledWith('sh', ['-c', command], {
         stdio: ['pipe', 'pipe', 'pipe'],
