@@ -18,19 +18,20 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
-  // Coverage thresholds - require 65% minimum (was 80%, adjusted for TypeScript migration)
+  // Coverage thresholds - significantly improved after Story 4.3 testing enhancements
   coverageThreshold: {
     global: {
-      branches: 65,
-      functions: 65,
-      lines: 65,
-      statements: 65
+      branches: 75,    // Improved from 65% (current: ~78%)
+      functions: 85,   // Improved from 65% (current: 90.44%)
+      lines: 80,       // Improved from 65% (current: 86.22%)
+      statements: 80   // Improved from 65% (current: 86.69%)
     }
   },
   // Faster test execution
   testTimeout: 5000,
   maxConcurrency: 4,
-  // Prevent test hanging
+  // Prevent test hanging and reduce noise from expected timeouts
   forceExit: true,
-  detectOpenHandles: true
+  detectOpenHandles: false,  // Disable to reduce noise from expected setTimeout usage
+  silent: false
 };
