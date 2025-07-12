@@ -4,6 +4,7 @@
 
 import { spawn } from 'child_process';
 import { ClaudeAutoResumeError } from '../utils/errors';
+import { createSpinner, withSpinner } from '../utils/progress';
 
 /**
  * Interface for usage limit result parsing
@@ -26,12 +27,13 @@ export class ClaudeCLI {
   constructor(private readonly cliPath = 'claude') {}
 
   /**
-   * Executes a Claude CLI command with timeout protection
+   * Executes a Claude CLI command with timeout protection and optional progress indication
    * @param args - Command line arguments
    * @param timeoutMs - Timeout in milliseconds (default: 30000)
+   * @param showProgress - Whether to show progress spinner (default: true for operations >2s)
    */
-  async executeClaudeCommand(args: string[], timeoutMs = 30000): Promise<string> {
-    return new Promise((resolve, reject) => {
+  async executeClaudeCommand(args: string[], timeoutMs = 30000, showProgress = timeoutMs >= 2000 && process.env.NODE_ENV !== 'test'): Promise<string> {
+    const operation = () => new Promise<string>((resolve, reject) => {
       const child = spawn(this.cliPath, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: timeoutMs,
@@ -98,6 +100,13 @@ export class ClaudeCLI {
         clearTimeout(timeoutHandle);
       });
     });
+
+    if (showProgress) {
+      const message = `Executing Claude CLI command: ${args.join(' ')}`;
+      return withSpinner(operation, message, 'dots');
+    } else {
+      return operation();
+    }
   }
 
   /**

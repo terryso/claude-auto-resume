@@ -14,6 +14,7 @@ import {
   validateTimeoutWithFeedback, 
   validateCommandWithFeedback 
 } from '../utils';
+import { DebugUtils } from '../utils/debug';
 import { NetworkUtils } from '../core/network';
 import type { CLIConfig } from '../config/types';
 
@@ -338,110 +339,65 @@ async function showSystemCheck(): Promise<void> {
 }
 
 /**
- * Shows comprehensive debug diagnostics
+ * Shows comprehensive debug diagnostics using enhanced DebugUtils
  */
 async function showDebugDiagnostics(options: CLIOptions, config: CLIConfig, prompt: string): Promise<void> {
-  logger.debug('=== DEBUG MODE DIAGNOSTICS ===');
-  
-  // Runtime environment
-  logger.debug('Runtime Environment:', {
-    nodeVersion: process.version,
-    platform: process.platform,
-    architecture: process.arch,
-    cwd: process.cwd(),
-    pid: process.pid,
-    uptime: `${Math.floor(process.uptime())}s`,
-    memoryUsage: process.memoryUsage(),
-    argv: process.argv,
-    uid: process.getuid ? process.getuid() : 'N/A',
-    gid: process.getgid ? process.getgid() : 'N/A'
-  });
-
-  // Time information
-  const currentTime = TimeUtils.getTimeDisplay(TimeUtils.getCurrentTimestamp());
-  logger.debug('Time Information:', {
-    current: currentTime.absolute,
-    relative: currentTime.relative,
-    timestamp: TimeUtils.getCurrentTimestamp(),
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    platformDateInfo: TimeUtils.getPlatformDateInfo()
-  });
-
-  // CLI options and configuration
-  logger.debug('CLI Options:', options);
-  logger.debug('Configuration:', config);
-  logger.debug('Final Prompt Analysis:', {
-    length: prompt.length,
-    trimmedLength: prompt.trim().length,
-    hasSpecialChars: /[<>"|&;`$(){}[\]\\]/.test(prompt),
-    wordCount: prompt.trim().split(/\s+/).length
-  });
-
-  // Environment variables
-  const relevantEnvVars = Object.keys(process.env)
-    .filter(key => key.startsWith('CLAUDE_') || key.includes('NODE') || key.includes('PATH'))
-    .reduce((acc, key) => {
-      acc[key] = process.env[key];
-      return acc;
-    }, {} as Record<string, string | undefined>);
-  
-  logger.debug('Environment Variables:', relevantEnvVars);
-
-  // Network connectivity
   try {
-    logger.debug('Testing network connectivity...');
-    const connectivityStatus = await NetworkUtils.getConnectivityStatus();
-    logger.debug('Network Connectivity Status:', connectivityStatus);
-  } catch (error) {
-    logger.debug('Network connectivity test failed:', { error });
-  }
+    // Enable debug mode in DebugUtils
+    DebugUtils.enableDebugMode();
 
-  // File system permissions
-  try {
-    const fs = require('fs');
-    const cwd = process.cwd();
-    const isWritable = fs.constants.W_OK;
-    fs.accessSync(cwd, isWritable);
-    logger.debug('File System:', {
-      currentDirectory: cwd,
-      writable: true
+    // Collect comprehensive system information
+    const systemInfo = await DebugUtils.withDebugTracking('collect-system-info', async () => {
+      return await DebugUtils.collectSystemInfo();
     });
-  } catch (error) {
-    logger.debug('File System:', {
-      currentDirectory: process.cwd(),
-      writable: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
 
-  // Claude CLI analysis
-  try {
-    const { execSync } = require('child_process');
-    const claudeVersion = execSync('claude --version', { encoding: 'utf8', timeout: 5000 }).trim();
-    const claudeHelp = execSync('claude --help', { encoding: 'utf8', timeout: 5000 });
+    // Collect configuration debug info
+    const configInfo = DebugUtils.collectConfigDebugInfo(
+      options,
+      process.env as Record<string, string>,
+      undefined, // config file path - would need to be passed from config loader
+      config,
+      config
+    );
+
+    // Format and display comprehensive debug output
+    const debugOutput = DebugUtils.formatDebugOutput(systemInfo, configInfo);
+    console.log(debugOutput);
+
+    // Additional prompt analysis
+    logger.debug('=== PROMPT ANALYSIS ===');
+    const promptValidation = validatePromptWithFeedback(prompt);
+    logger.debug('Prompt Validation:', promptValidation);
     
-    logger.debug('Claude CLI Analysis:', {
-      version: claudeVersion,
+    logger.debug('Prompt Details:', {
+      length: prompt.length,
+      trimmedLength: prompt.trim().length,
+      hasSpecialChars: /[<>"|&;`$(){}[\]\\]/.test(prompt),
+      wordCount: prompt.trim().split(/\s+/).length,
+      lines: prompt.split('\n').length
+    });
+
+    // Performance metrics
+    logger.debug('=== PERFORMANCE METRICS ===');
+    const performanceMetrics = DebugUtils.getPerformanceMetrics();
+    logger.debug('Current Performance:', performanceMetrics);
+
+    // Claude CLI analysis
+    logger.debug('=== CLAUDE CLI ANALYSIS ===');
+    logger.debug('Claude CLI Info:', {
+      available: systemInfo.claude.available,
+      version: systemInfo.claude.version,
       path: config.claudeCliPath,
-      helpAvailable: claudeHelp.length > 0,
-      supportsSkipPermissions: claudeHelp.includes('dangerously-skip-permissions'),
-      supportsContinue: claudeHelp.includes('-c') || claudeHelp.includes('--continue')
+      error: systemInfo.claude.error
     });
+
+    // Offer to export debug information
+    logger.debug('=== DEBUG EXPORT ===');
+    logger.info('Debug information collected successfully');
+    logger.info('To export full debug info to file, use: claude-auto-resume --debug --export');
+
   } catch (error) {
-    logger.debug('Claude CLI Analysis Failed:', { 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      path: config.claudeCliPath
-    });
+    logger.error('Debug diagnostics failed:', { error: error instanceof Error ? error.message : String(error) });
+    throw error;
   }
-
-  // Performance metrics
-  logger.debug('Performance Metrics:', {
-    startTime: Date.now(),
-    heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
-    heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`,
-    external: `${Math.round(process.memoryUsage().external / 1024 / 1024)}MB`,
-    cpuUsage: process.cpuUsage()
-  });
-
-  logger.debug('=== END DEBUG DIAGNOSTICS ===');
 }

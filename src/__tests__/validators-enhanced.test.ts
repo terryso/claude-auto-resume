@@ -7,6 +7,9 @@ import {
   validateTimeoutWithFeedback,
   validateTimestampWithFeedback,
   validateCommandWithFeedback,
+  validateFilePathWithFeedback,
+  validateEnvironmentVariableWithFeedback,
+  validateArgumentCombinationsWithFeedback,
 } from '../utils/validators';
 
 describe('Enhanced Validators', () => {
@@ -228,6 +231,180 @@ describe('Enhanced Validators', () => {
       const result = validateCommandWithFeedback('echo hello &&');
       expect(result.valid).toBe(true);
       expect(result.warnings).toContain('Command ends with shell operators - this might be incomplete');
+    });
+  });
+
+  describe('validateFilePathWithFeedback', () => {
+    it('should reject null/undefined file paths', () => {
+      const result1 = validateFilePathWithFeedback(null, 'read');
+      expect(result1.valid).toBe(false);
+      expect(result1.error).toContain('null or undefined');
+
+      const result2 = validateFilePathWithFeedback(undefined, 'write');
+      expect(result2.valid).toBe(false);
+      expect(result2.error).toContain('null or undefined');
+    });
+
+    it('should reject non-string file paths', () => {
+      const result = validateFilePathWithFeedback(123, 'read');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('must be a string');
+      expect(result.suggestion).toContain('string path');
+    });
+
+    it('should reject empty file paths', () => {
+      const result = validateFilePathWithFeedback('   ', 'write');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('empty');
+    });
+
+    it('should detect path traversal attempts', () => {
+      const result1 = validateFilePathWithFeedback('../../../etc/passwd', 'read');
+      expect(result1.valid).toBe(false);
+      expect(result1.error).toContain('Path traversal detected');
+
+      const result2 = validateFilePathWithFeedback('..\\windows\\system32', 'read');
+      expect(result2.valid).toBe(false);
+      expect(result2.error).toContain('Path traversal detected');
+    });
+
+    it('should reject overly long paths', () => {
+      const longPath = '/very/long/path/' + 'a'.repeat(300);
+      const result = validateFilePathWithFeedback(longPath, 'read');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('too long');
+    });
+
+    it('should handle file system access errors gracefully', () => {
+      const result = validateFilePathWithFeedback('/nonexistent/path/file.txt', 'read');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('validation failed');
+      expect(result.suggestion).toContain('readable');
+    });
+
+    it('should validate current directory (which should exist)', () => {
+      const result = validateFilePathWithFeedback('.', 'read');
+      // This should pass since current directory exists and is readable
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('validateEnvironmentVariableWithFeedback', () => {
+    it('should accept undefined environment variables', () => {
+      const result = validateEnvironmentVariableWithFeedback('TEST_VAR', undefined, 'string');
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject non-string environment variable values', () => {
+      const result = validateEnvironmentVariableWithFeedback('TEST_VAR', 123, 'string');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('must be a string');
+    });
+
+    it('should validate string environment variables', () => {
+      const result1 = validateEnvironmentVariableWithFeedback('TEST_VAR', 'valid_value', 'string');
+      expect(result1.valid).toBe(true);
+
+      const result2 = validateEnvironmentVariableWithFeedback('TEST_VAR', '   ', 'string');
+      expect(result2.valid).toBe(false);
+      expect(result2.error).toContain('cannot be empty');
+    });
+
+    it('should validate number environment variables', () => {
+      const result1 = validateEnvironmentVariableWithFeedback('PORT', '3000', 'number');
+      expect(result1.valid).toBe(true);
+
+      const result2 = validateEnvironmentVariableWithFeedback('PORT', 'not_a_number', 'number');
+      expect(result2.valid).toBe(false);
+      expect(result2.error).toContain('valid number');
+
+      const result3 = validateEnvironmentVariableWithFeedback('PORT', 'Infinity', 'number');
+      expect(result3.valid).toBe(false);
+      expect(result3.error).toContain('finite');
+    });
+
+    it('should validate boolean environment variables', () => {
+      const validBooleans = ['true', 'false', '1', '0', 'yes', 'no', 'TRUE', 'FALSE'];
+      for (const value of validBooleans) {
+        const result = validateEnvironmentVariableWithFeedback('ENABLE_FEATURE', value, 'boolean');
+        expect(result.valid).toBe(true);
+      }
+
+      const result = validateEnvironmentVariableWithFeedback('ENABLE_FEATURE', 'maybe', 'boolean');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('boolean value');
+      expect(result.suggestion).toContain('true');
+    });
+  });
+
+  describe('validateArgumentCombinationsWithFeedback', () => {
+    it('should validate compatible option combinations', () => {
+      const result = validateArgumentCombinationsWithFeedback({
+        prompt: 'test',
+        verbose: true
+      });
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should detect mutually exclusive options', () => {
+      const result1 = validateArgumentCombinationsWithFeedback({
+        execute: 'command',
+        continue: true
+      });
+      expect(result1.valid).toBe(false);
+      expect(result1.errors).toContain('Cannot use execute mode with continue mode');
+
+      const result2 = validateArgumentCombinationsWithFeedback({
+        cmd: 'command',
+        continue: true
+      });
+      expect(result2.valid).toBe(false);
+      expect(result2.errors).toContain('Cannot use custom command with continue mode');
+
+      const result3 = validateArgumentCombinationsWithFeedback({
+        execute: 'command1',
+        cmd: 'command2'
+      });
+      expect(result3.valid).toBe(false);
+      expect(result3.errors).toContain('Cannot use both execute and cmd options together');
+
+      const result4 = validateArgumentCombinationsWithFeedback({
+        version: true,
+        help: true
+      });
+      expect(result4.valid).toBe(false);
+      expect(result4.errors).toContain('Use either --version or --help, not both');
+    });
+
+    it('should provide suggestions for incomplete combinations', () => {
+      const result1 = validateArgumentCombinationsWithFeedback({
+        execute: 'command'
+      });
+      expect(result1.valid).toBe(true);
+      expect(result1.suggestions).toContain('Consider providing a prompt with --prompt when using --execute');
+
+      const result2 = validateArgumentCombinationsWithFeedback({
+        cmd: 'command'
+      });
+      expect(result2.valid).toBe(true);
+      expect(result2.suggestions).toContain('Consider providing a prompt with --prompt when using --cmd');
+    });
+
+    it('should warn about test mode with production options', () => {
+      const result = validateArgumentCombinationsWithFeedback({
+        testMode: 60,
+        execute: 'production-command'
+      });
+      expect(result.valid).toBe(true);
+      expect(result.suggestions).toContain('Test mode with execute/cmd may not behave as expected - use for testing only');
+    });
+
+    it('should handle empty options object', () => {
+      const result = validateArgumentCombinationsWithFeedback({});
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(result.suggestions).toHaveLength(0);
     });
   });
 });

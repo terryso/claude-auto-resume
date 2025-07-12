@@ -509,6 +509,181 @@ export function validateWritableDirectory(dirPath: string): boolean {
 }
 
 /**
+ * Enhanced file path validation with detailed feedback
+ */
+export function validateFilePathWithFeedback(filePath: unknown, mode: 'read' | 'write' | 'execute'): { valid: boolean; error?: string; suggestion?: string } {
+  if (filePath === null || filePath === undefined) {
+    return {
+      valid: false,
+      error: 'File path cannot be null or undefined',
+      suggestion: 'Provide a valid file path'
+    };
+  }
+
+  if (typeof filePath !== 'string') {
+    return {
+      valid: false,
+      error: `File path must be a string, got ${typeof filePath}`,
+      suggestion: 'Use a string path like "/path/to/file" or "./relative/path"'
+    };
+  }
+
+  const trimmed = filePath.trim();
+  if (trimmed.length === 0) {
+    return {
+      valid: false,
+      error: 'File path cannot be empty',
+      suggestion: 'Provide a valid file path'
+    };
+  }
+
+  // Check for path traversal attempts
+  if (/\.\.\//.test(trimmed) || /\.\.\\/.test(trimmed)) {
+    return {
+      valid: false,
+      error: 'Path traversal detected',
+      suggestion: 'Use absolute paths or safe relative paths without ".."'
+    };
+  }
+
+  // Check if path looks reasonable
+  if (trimmed.length > 260) { // Windows MAX_PATH limit
+    return {
+      valid: false,
+      error: 'File path is too long (maximum 260 characters)',
+      suggestion: 'Use a shorter path or move files to a location with shorter path'
+    };
+  }
+
+  try {
+    const accessMode =
+      mode === 'read'
+        ? fs.constants.R_OK
+        : mode === 'write'
+          ? fs.constants.W_OK
+          : fs.constants.X_OK;
+
+    fs.accessSync(trimmed, accessMode);
+    return { valid: true };
+  } catch (error) {
+    return {
+      valid: false,
+      error: `File path validation failed: ${error}`,
+      suggestion: mode === 'read' 
+        ? 'Ensure the file exists and is readable'
+        : mode === 'write'
+          ? 'Ensure the directory exists and is writable'
+          : 'Ensure the file exists and is executable'
+    };
+  }
+}
+
+/**
+ * Enhanced environment variable validation with range checking
+ */
+export function validateEnvironmentVariableWithFeedback(varName: string, value: unknown, expectedType: 'string' | 'number' | 'boolean'): { valid: boolean; error?: string; suggestion?: string } {
+  if (value === undefined) {
+    return { valid: true }; // Environment variables are optional
+  }
+
+  if (typeof value !== 'string') {
+    return {
+      valid: false,
+      error: `Environment variable ${varName} must be a string`,
+      suggestion: 'Environment variables are always strings - convert if needed'
+    };
+  }
+
+  const trimmed = value.trim();
+  
+  switch (expectedType) {
+    case 'string':
+      if (trimmed.length === 0) {
+        return {
+          valid: false,
+          error: `Environment variable ${varName} cannot be empty`,
+          suggestion: 'Provide a non-empty value or unset the variable'
+        };
+      }
+      break;
+
+    case 'number':
+      const num = Number(trimmed);
+      if (isNaN(num)) {
+        return {
+          valid: false,
+          error: `Environment variable ${varName} must be a valid number`,
+          suggestion: 'Use numeric values like "30", "60", "120"'
+        };
+      }
+      if (!Number.isFinite(num)) {
+        return {
+          valid: false,
+          error: `Environment variable ${varName} must be finite`,
+          suggestion: 'Avoid Infinity or -Infinity values'
+        };
+      }
+      break;
+
+    case 'boolean':
+      const lowerValue = trimmed.toLowerCase();
+      if (!['true', 'false', '1', '0', 'yes', 'no'].includes(lowerValue)) {
+        return {
+          valid: false,
+          error: `Environment variable ${varName} must be a boolean value`,
+          suggestion: 'Use "true", "false", "1", "0", "yes", or "no"'
+        };
+      }
+      break;
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validates command-line argument combinations and provides feedback
+ */
+export function validateArgumentCombinationsWithFeedback(options: CLIOptions): { valid: boolean; errors: string[]; suggestions: string[] } {
+  const errors: string[] = [];
+  const suggestions: string[] = [];
+
+  // Check mutually exclusive options
+  const mutuallyExclusive: Array<[string, string, string]> = [
+    ['execute', 'continue', 'Cannot use execute mode with continue mode'],
+    ['cmd', 'continue', 'Cannot use custom command with continue mode'],
+    ['execute', 'cmd', 'Cannot use both execute and cmd options together'],
+    ['version', 'help', 'Use either --version or --help, not both'],
+  ];
+
+  for (const [option1, option2, message] of mutuallyExclusive) {
+    if (options[option1 as keyof CLIOptions] && options[option2 as keyof CLIOptions]) {
+      errors.push(message);
+      suggestions.push(`Choose either --${option1} or --${option2}, but not both`);
+    }
+  }
+
+  // Check for incomplete option combinations
+  if (options.execute && !options.prompt) {
+    suggestions.push('Consider providing a prompt with --prompt when using --execute');
+  }
+
+  if (options.cmd && !options.prompt) {
+    suggestions.push('Consider providing a prompt with --prompt when using --cmd');
+  }
+
+  // Check for potentially confusing combinations
+  if (options.testMode && (options.execute || options.cmd)) {
+    suggestions.push('Test mode with execute/cmd may not behave as expected - use for testing only');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    suggestions
+  };
+}
+
+/**
  * Configuration precedence validation - ensures proper override order
  */
 export function validateConfigurationPrecedence(

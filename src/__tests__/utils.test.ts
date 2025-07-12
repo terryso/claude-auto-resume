@@ -223,6 +223,142 @@ describe('Utils Module', () => {
       statSyncSpy.mockRestore();
       createWriteStreamSpy.mockRestore();
     });
+
+    it('should create directory for log file if it does not exist', () => {
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Mock all file system operations to prevent actual file creation
+      const existsSpy = jest.spyOn(fs, 'existsSync');
+      const mkdirSpy = jest.spyOn(fs, 'mkdirSync').mockImplementation();
+      const appendFileSpy = jest.spyOn(fs, 'appendFileSync').mockImplementation();
+      const statSpy = jest.spyOn(fs, 'statSync').mockReturnValue({ size: 1000 });
+      const createWriteStreamSpy = jest.spyOn(fs, 'createWriteStream').mockReturnValue({
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+        once: jest.fn(),
+        removeListener: jest.fn()
+      });
+      
+      // Mock directory doesn't exist first time, then exists
+      existsSpy.mockReturnValueOnce(false); // Directory doesn't exist
+      existsSpy.mockReturnValue(true); // File exists for other checks
+      
+      const testLogger = new Logger();
+      testLogger.setFileOutput('/nonexistent/dir/test.log');
+      testLogger.info('Test message');
+      
+      expect(mkdirSpy).toHaveBeenCalledWith('/nonexistent/dir', { recursive: true });
+      
+      // Cleanup
+      testLogger.close();
+      existsSpy.mockRestore();
+      mkdirSpy.mockRestore();
+      appendFileSpy.mockRestore();
+      statSpy.mockRestore();
+      createWriteStreamSpy.mockRestore();
+    });
+
+    it('should handle log rotation when file size exceeds limit', () => {
+      const fs = require('fs');
+      const testLogger = new Logger();
+      
+      // Mock file system operations
+      const existsSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      const statSpy = jest.spyOn(fs, 'statSync').mockReturnValue({ size: 10 * 1024 * 1024 + 1 }); // Exceeds 10MB
+      const unlinkSpy = jest.spyOn(fs, 'unlinkSync').mockImplementation();
+      const renameSpy = jest.spyOn(fs, 'renameSync').mockImplementation();
+      const appendFileSpy = jest.spyOn(fs, 'appendFileSync').mockImplementation();
+      const createWriteStreamSpy = jest.spyOn(fs, 'createWriteStream').mockReturnValue({
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+        once: jest.fn(),
+        removeListener: jest.fn()
+      });
+      
+      testLogger.setFileOutput('/test/app.log');
+      testLogger.info('Test message that triggers rotation');
+      
+      // Verify log rotation was triggered
+      expect(statSpy).toHaveBeenCalled();
+      
+      // Cleanup
+      testLogger.close();
+      existsSpy.mockRestore();
+      statSpy.mockRestore();
+      unlinkSpy.mockRestore();
+      renameSpy.mockRestore();
+      appendFileSpy.mockRestore();
+      createWriteStreamSpy.mockRestore();
+    });
+
+    it('should not rotate logs if file does not exist', () => {
+      const fs = require('fs');
+      const testLogger = new Logger();
+      
+      const existsSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(false);
+      const statSpy = jest.spyOn(fs, 'statSync');
+      const appendFileSpy = jest.spyOn(fs, 'appendFileSync').mockImplementation();
+      const mkdirSpy = jest.spyOn(fs, 'mkdirSync').mockImplementation();
+      const createWriteStreamSpy = jest.spyOn(fs, 'createWriteStream').mockReturnValue({
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+        once: jest.fn(),
+        removeListener: jest.fn()
+      });
+      
+      testLogger.setFileOutput('/test/nonexistent.log');
+      testLogger.info('Test message');
+      
+      // statSync should not be called if file doesn't exist
+      expect(statSpy).not.toHaveBeenCalled();
+      
+      // Cleanup
+      testLogger.close();
+      existsSpy.mockRestore();
+      statSpy.mockRestore();
+      appendFileSpy.mockRestore();
+      mkdirSpy.mockRestore();
+      createWriteStreamSpy.mockRestore();
+    });
+
+    it('should handle file writing errors gracefully', () => {
+      const fs = require('fs');
+      const testLogger = new Logger();
+      
+      const existsSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      const appendFileSpy = jest.spyOn(fs, 'appendFileSync').mockImplementation(() => {
+        throw new Error('Permission denied');
+      });
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const mkdirSpy = jest.spyOn(fs, 'mkdirSync').mockImplementation();
+      const statSpy = jest.spyOn(fs, 'statSync').mockReturnValue({ size: 1000 });
+      const createWriteStreamSpy = jest.spyOn(fs, 'createWriteStream').mockReturnValue({
+        write: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+        once: jest.fn(),
+        removeListener: jest.fn()
+      });
+      
+      testLogger.setFileOutput('/test/readonly.log');
+      
+      // This should not throw, but log to console instead
+      expect(() => testLogger.error('Test error')).not.toThrow();
+      expect(consoleSpy).toHaveBeenCalled();
+      
+      // Cleanup
+      testLogger.close();
+      existsSpy.mockRestore();
+      appendFileSpy.mockRestore();
+      consoleSpy.mockRestore();
+      mkdirSpy.mockRestore();
+      statSpy.mockRestore();
+      createWriteStreamSpy.mockRestore();
+    });
   });
 
   describe('Validators', () => {
@@ -619,6 +755,141 @@ describe('Utils Module', () => {
       expect(error.message).toContain('Operation timed out');
       expect(error.category).toBe(ErrorCategory.TIMEOUT);
       expect(error.context).toContain('5000ms');
+    });
+
+    it('should create enhanced permission error', () => {
+      const error = EnhancedErrors.permissionError('Access denied', '/protected/file');
+      
+      expect(error.message).toContain('Permission denied');
+      expect(error.category).toBe(ErrorCategory.PERMISSION);
+      expect(error.context).toContain('/protected/file');
+    });
+
+    it('should create enhanced invalid timestamp error', () => {
+      const error = EnhancedErrors.invalidTimestamp('bad-timestamp', 'Claude output parsing');
+      
+      expect(error.message).toContain('Invalid timestamp format');
+      expect(error.category).toBe(ErrorCategory.VALIDATION);
+      expect(error.context).toContain('Claude output parsing');
+    });
+
+    it('should create enhanced resume failed error', () => {
+      const error = EnhancedErrors.resumeFailed('Command failed', 'continue');
+      
+      expect(error.message).toContain('Resume command failed');
+      expect(error.category).toBe(ErrorCategory.COMMAND_EXECUTION);
+      expect(error.context).toContain('continue');
+    });
+  });
+
+  describe('ClaudeAutoResumeError category recommendations', () => {
+    it('should provide network category recommendations', () => {
+      const error = new ClaudeAutoResumeError('Network error', 3, undefined, undefined, undefined, undefined, ErrorCategory.NETWORK);
+      const recommendations = error.getRecoveryRecommendations();
+      
+      expect(recommendations).toContain('Check your internet connection');
+      expect(recommendations).toContain('Verify firewall settings');
+      expect(recommendations).toContain('Try again in a few moments');
+    });
+
+    it('should provide configuration category recommendations', () => {
+      const error = new ClaudeAutoResumeError('Config error', 1, undefined, undefined, undefined, undefined, ErrorCategory.CONFIGURATION);
+      const recommendations = error.getRecoveryRecommendations();
+      
+      expect(recommendations).toContain('Check environment variables');
+      expect(recommendations).toContain('Verify configuration file format');
+      expect(recommendations).toContain('Use --check flag for system diagnostics');
+    });
+
+    it('should provide command execution category recommendations', () => {
+      const error = new ClaudeAutoResumeError('Execution error', 1, undefined, undefined, undefined, undefined, ErrorCategory.COMMAND_EXECUTION);
+      const recommendations = error.getRecoveryRecommendations();
+      
+      expect(recommendations).toContain('Test the command manually first');
+      expect(recommendations).toContain('Check command syntax and permissions');
+      expect(recommendations).toContain('Use absolute paths for files and commands');
+    });
+
+    it('should provide file system category recommendations', () => {
+      const error = new ClaudeAutoResumeError('File error', 1, undefined, undefined, undefined, undefined, ErrorCategory.FILE_SYSTEM);
+      const recommendations = error.getRecoveryRecommendations();
+      
+      expect(recommendations).toContain('Check file and directory permissions');
+      expect(recommendations).toContain('Verify file paths exist');
+      expect(recommendations).toContain('Ensure sufficient disk space');
+    });
+
+    it('should provide validation category recommendations', () => {
+      const error = new ClaudeAutoResumeError('Validation error', 1, undefined, undefined, undefined, undefined, ErrorCategory.VALIDATION);
+      const recommendations = error.getRecoveryRecommendations();
+      
+      expect(recommendations).toContain('Review input format requirements');
+      expect(recommendations).toContain('Check parameter values and ranges');
+      expect(recommendations).toContain('Consult help documentation with --help');
+    });
+
+    it('should provide timeout category recommendations', () => {
+      const error = new ClaudeAutoResumeError('Timeout error', 1, undefined, undefined, undefined, undefined, ErrorCategory.TIMEOUT);
+      const recommendations = error.getRecoveryRecommendations();
+      
+      expect(recommendations).toContain('Increase timeout values if appropriate');
+      expect(recommendations).toContain('Check network connectivity');
+      expect(recommendations).toContain('Retry the operation');
+    });
+
+    it('should provide permission category recommendations', () => {
+      const error = new ClaudeAutoResumeError('Permission error', 1, undefined, undefined, undefined, undefined, ErrorCategory.PERMISSION);
+      const recommendations = error.getRecoveryRecommendations();
+      
+      expect(recommendations).toContain('Check file and directory permissions');
+      expect(recommendations).toContain('Run with appropriate user privileges');
+      expect(recommendations).toContain('Set CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false for manual control');
+    });
+
+    it('should provide default recommendations for unknown categories', () => {
+      const error = new ClaudeAutoResumeError('Unknown error', 1, undefined, undefined, undefined, undefined, 'UNKNOWN' as ErrorCategory);
+      const recommendations = error.getRecoveryRecommendations();
+      
+      expect(recommendations).toContain('Use --debug flag for detailed diagnostics');
+      expect(recommendations).toContain('Check system with --check flag');
+      expect(recommendations).toContain('Review documentation and examples');
+    });
+  });
+
+  describe('Error utility functions', () => {
+    it('should create standard CLI error', () => {
+      const error = createError('Test message', 'TEST_CODE', 2);
+      
+      expect(error).toBeInstanceOf(CLIError);
+      expect(error.message).toBe('Test message');
+      expect(error.code).toBe('TEST_CODE');
+      expect(error.exitCode).toBe(2);
+    });
+
+    it('should create CLI error with default exit code', () => {
+      const error = createError('Test message', 'TEST_CODE');
+      
+      expect(error.exitCode).toBe(1);
+    });
+
+    it('should identify custom CLI errors', () => {
+      const cliError = new CLIError('CLI error', 'CLI_ERR');
+      const standardError = new Error('Standard error');
+      const claudeError = new ClaudeAutoResumeError('Claude error', 1);
+      
+      expect(isCustomError(cliError)).toBe(true);
+      expect(isCustomError(standardError)).toBe(false);
+      expect(isCustomError(claudeError)).toBe(false);
+      expect(isCustomError(null)).toBe(false);
+      expect(isCustomError(undefined)).toBe(false);
+      expect(isCustomError('string')).toBe(false);
+    });
+
+    it('should have predefined error codes', () => {
+      expect(ErrorCodes.INVALID_TIMESTAMP).toBe('INVALID_TIMESTAMP');
+      expect(ErrorCodes.CLAUDE_CLI_FAILED).toBe('CLAUDE_CLI_FAILED');
+      expect(ErrorCodes.RESUME_FAILED).toBe('RESUME_FAILED');
+      expect(ErrorCodes.NETWORK_ERROR).toBe('NETWORK_ERROR');
     });
   });
 });

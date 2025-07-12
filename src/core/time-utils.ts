@@ -141,28 +141,28 @@ export class TimeUtils {
     const absDiff = Math.abs(diff);
 
     if (absDiff < 60) {
-      const seconds = Math.floor(absDiff);
+      const seconds = Math.round(absDiff);
       if (diff > 0) {
         return `in ${seconds} second${seconds !== 1 ? 's' : ''}`;
       } else {
         return `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
       }
     } else if (absDiff < 3600) {
-      const minutes = Math.floor(absDiff / 60);
+      const minutes = Math.round(absDiff / 60);
       if (diff > 0) {
         return `in ${minutes} minute${minutes !== 1 ? 's' : ''}`;
       } else {
         return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
       }
     } else if (absDiff < 86400) {
-      const hours = Math.floor(absDiff / 3600);
+      const hours = Math.round(absDiff / 3600);
       if (diff > 0) {
         return `in ${hours} hour${hours !== 1 ? 's' : ''}`;
       } else {
         return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
       }
     } else {
-      const days = Math.floor(absDiff / 86400);
+      const days = Math.round(absDiff / 86400);
       if (diff > 0) {
         return `in ${days} day${days !== 1 ? 's' : ''}`;
       } else {
@@ -178,6 +178,8 @@ export class TimeUtils {
     absolute: string;
     relative: string;
     duration: string;
+    timezone: string;
+    formatted: string;
   } {
     const now = Date.now() / 1000;
     const diff = timestamp - now;
@@ -185,8 +187,97 @@ export class TimeUtils {
     return {
       absolute: TimeUtils.timestampToString(timestamp),
       relative: TimeUtils.formatRelativeTime(timestamp),
-      duration: TimeUtils.formatDuration(Math.max(0, diff))
+      duration: TimeUtils.formatDuration(Math.max(0, diff)),
+      timezone: TimeUtils.getTimezoneDisplay(timestamp),
+      formatted: TimeUtils.formatTimeWithContext(timestamp)
     };
+  }
+
+  /**
+   * Formats time with additional context (timezone, relative, duration)
+   */
+  static formatTimeWithContext(timestamp: number): string {
+    const now = Date.now() / 1000;
+    const diff = timestamp - now;
+    const date = new Date(timestamp * 1000);
+    
+    // Get locale-specific time string with timezone
+    const timeString = date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short'
+    });
+    
+    const relative = TimeUtils.formatRelativeTime(timestamp);
+    
+    if (Math.abs(diff) < 86400) { // Less than 24 hours
+      return `${timeString} (${relative})`;
+    } else {
+      const duration = TimeUtils.formatDuration(Math.abs(diff));
+      return `${timeString} (${relative}, ${duration} ${diff > 0 ? 'from now' : 'ago'})`;
+    }
+  }
+
+  /**
+   * Gets timezone display information
+   */
+  static getTimezoneDisplay(timestamp: number): string {
+    const date = new Date(timestamp * 1000);
+    const offset = date.getTimezoneOffset();
+    const absOffset = Math.abs(offset);
+    const hours = Math.floor(absOffset / 60);
+    const minutes = absOffset % 60;
+    const sign = offset <= 0 ? '+' : '-';
+    
+    const offsetString = `UTC${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    
+    // Try to get timezone name
+    try {
+      const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      return `${timezoneName} (${offsetString})`;
+    } catch {
+      return offsetString;
+    }
+  }
+
+  /**
+   * Dynamic time formatting based on duration
+   */
+  static formatDynamicDuration(seconds: number): string {
+    const absSecs = Math.abs(seconds);
+    
+    if (absSecs < 60) {
+      // Show seconds for short durations
+      return TimeUtils.formatDuration(seconds);
+    } else if (absSecs < 3600) {
+      // Show minutes and seconds for medium durations
+      const minutes = Math.floor(absSecs / 60);
+      const remainingSecs = absSecs % 60;
+      if (remainingSecs === 0) {
+        return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+      }
+      return `${minutes} minute${minutes !== 1 ? 's' : ''} ${remainingSecs} second${remainingSecs !== 1 ? 's' : ''}`;
+    } else if (absSecs < 86400) {
+      // Show hours and minutes for longer durations
+      const hours = Math.floor(absSecs / 3600);
+      const minutes = Math.floor((absSecs % 3600) / 60);
+      if (minutes === 0) {
+        return `${hours} hour${hours !== 1 ? 's' : ''}`;
+      }
+      return `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    } else {
+      // Show days and hours for very long durations
+      const days = Math.floor(absSecs / 86400);
+      const hours = Math.floor((absSecs % 86400) / 3600);
+      if (hours === 0) {
+        return `${days} day${days !== 1 ? 's' : ''}`;
+      }
+      return `${days} day${days !== 1 ? 's' : ''} ${hours} hour${hours !== 1 ? 's' : ''}`;
+    }
   }
 
   /**
