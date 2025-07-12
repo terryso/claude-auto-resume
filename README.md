@@ -42,7 +42,17 @@ This script is particularly useful when using Claude Code for development in the
 
 ## Installation
 
-### Method 1: Using Makefile (Recommended)
+### Method 1: Using npm (Recommended for TypeScript version)
+
+```bash
+# Global installation
+npm install -g claude-auto-resume
+
+# Use without installing (via npx)
+npx claude-auto-resume "your prompt here"
+```
+
+### Method 2: Using Makefile (Shell script version)
 
 ```bash
 # Global installation
@@ -80,6 +90,7 @@ chmod +x claude-auto-resume.sh
 
 ### Basic Usage
 
+#### Installed globally via npm:
 ```bash
 # Start new session with default prompt "continue"
 claude-auto-resume
@@ -95,7 +106,25 @@ claude-auto-resume -c "please continue the previous task"
 
 # Continue previous conversation with custom prompt using flag
 claude-auto-resume -c -p "resume where we left off"
+```
 
+#### Using npx (without installing):
+```bash
+# Start new session with default prompt "continue"
+npx claude-auto-resume
+
+# Start new session with custom prompt
+npx claude-auto-resume "implement user authentication"
+
+# Continue previous conversation with custom prompt
+npx claude-auto-resume -c "please continue the previous task"
+
+# Continue with prompt flag
+npx claude-auto-resume -c -p "resume where we left off"
+```
+
+#### Shell script version:
+```bash
 # Execute custom command after wait period
 claude-auto-resume -e "npm run dev"
 
