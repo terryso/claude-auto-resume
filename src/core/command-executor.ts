@@ -67,8 +67,11 @@ export class CommandExecutor {
     }
 
     const startTime = Date.now();
+    const startTimestamp = Math.floor(startTime / 1000);
+    const timeDisplay = TimeUtils.getTimeDisplay(startTimestamp);
+    
     console.log(`[INFO] Starting command execution: ${command}`);
-    console.log(`[INFO] Start time: ${new Date().toLocaleString()}`);
+    console.log(`[INFO] Start time: ${timeDisplay.absolute} (${timeDisplay.relative})`);
     console.log(
       `[INFO] Maximum execution time: ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`
     );
@@ -105,12 +108,16 @@ export class CommandExecutor {
         const executionTime = Date.now() - startTime;
         const exitCode = code || 0;
 
+        const endTime = Date.now();
+        const endTimestamp = Math.floor(endTime / 1000);
+        const endTimeDisplay = TimeUtils.getTimeDisplay(endTimestamp);
+        const durationFormatted = TimeUtils.formatDuration(Math.floor(executionTime / 1000));
+        const durationShort = TimeUtils.formatDurationShort(Math.floor(executionTime / 1000));
+
         console.log(`\n[INFO] Command completed`);
         console.log(`[INFO] Exit code: ${exitCode}`);
-        console.log(
-          `[INFO] Execution time: ${TimeUtils.formatDuration(Math.floor(executionTime / 1000))}`
-        );
-        console.log(`[INFO] End time: ${new Date().toLocaleString()}`);
+        console.log(`[INFO] Execution time: ${durationFormatted} (${durationShort})`);
+        console.log(`[INFO] End time: ${endTimeDisplay.absolute} (${endTimeDisplay.relative})`);
 
         if (timedOut) {
           console.log('[WARNING] Command was terminated due to timeout');
@@ -140,11 +147,11 @@ export class CommandExecutor {
       // Handle process errors
       child.on('error', (error) => {
         const executionTime = Date.now() - startTime;
+        const durationFormatted = TimeUtils.formatDuration(Math.floor(executionTime / 1000));
+        const durationShort = TimeUtils.formatDurationShort(Math.floor(executionTime / 1000));
 
         console.log(`\n[ERROR] Command execution failed: ${error.message}`);
-        console.log(
-          `[INFO] Execution time: ${TimeUtils.formatDuration(Math.floor(executionTime / 1000))}`
-        );
+        console.log(`[INFO] Execution time: ${durationFormatted} (${durationShort})`);
 
         resolve({
           exitCode: 1,

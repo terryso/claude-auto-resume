@@ -14,6 +14,16 @@ export {
 } from './errors';
 export { Logger, logger, LogLevel } from './logger';
 export {
+  Spinner,
+  ProgressBar,
+  LoadingDots,
+  createSpinner,
+  createProgressBar,
+  withSpinner,
+  withProgress,
+  type ProgressIndicator
+} from './progress';
+export {
   validatePrompt,
   validateTimeout,
   validateTimestamp,
@@ -25,4 +35,8 @@ export {
   validateFilePath,
   validateWritableDirectory,
   validateConfigurationPrecedence,
+  validatePromptWithFeedback,
+  validateTimeoutWithFeedback,
+  validateTimestampWithFeedback,
+  validateCommandWithFeedback,
 } from './validators';

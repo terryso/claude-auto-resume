@@ -212,14 +212,16 @@ export class ProgressBar implements ProgressIndicator {
 export function createSpinner(style?: keyof typeof SPINNER_STYLES): Spinner {
   const spinner = new Spinner(style);
   
-  // Ensure cleanup on process exit
-  const cleanup = () => {
-    spinner.stop();
-  };
+  // Ensure cleanup on process exit (only in non-test environment)
+  if (process.env.NODE_ENV !== 'test') {
+    const cleanup = () => {
+      spinner.stop();
+    };
 
-  process.on('exit', cleanup);
-  process.on('SIGINT', cleanup);
-  process.on('SIGTERM', cleanup);
+    process.on('exit', cleanup);
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
+  }
 
   return spinner;
 }
@@ -230,14 +232,16 @@ export function createSpinner(style?: keyof typeof SPINNER_STYLES): Spinner {
 export function createProgressBar(totalSteps?: number): ProgressBar {
   const progressBar = new ProgressBar(totalSteps);
   
-  // Ensure cleanup on process exit
-  const cleanup = () => {
-    progressBar.stop();
-  };
+  // Ensure cleanup on process exit (only in non-test environment)
+  if (process.env.NODE_ENV !== 'test') {
+    const cleanup = () => {
+      progressBar.stop();
+    };
 
-  process.on('exit', cleanup);
-  process.on('SIGINT', cleanup);
-  process.on('SIGTERM', cleanup);
+    process.on('exit', cleanup);
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
+  }
 
   return progressBar;
 }

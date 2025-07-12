@@ -5,8 +5,17 @@
 import { Command } from 'commander';
 import { CLIOptions } from './types';
 import { loadConfiguration } from '../config';
-import { ClaudeCLI, CommandExecutor } from '../core';
-import { logger, LogLevel, validatePrompt } from '../utils';
+import { ClaudeCLI, CommandExecutor, TimeUtils } from '../core';
+import { 
+  logger, 
+  LogLevel, 
+  validatePrompt, 
+  validatePromptWithFeedback, 
+  validateTimeoutWithFeedback, 
+  validateCommandWithFeedback 
+} from '../utils';
+import { NetworkUtils } from '../core/network';
+import type { CLIConfig } from '../config/types';
 
 /**
  * Sets up the CLI commands and options
@@ -146,16 +155,36 @@ TROUBLESHOOTING:
           process.exit(1);
         }
 
-        if (options.execute && !options.execute.trim()) {
-          logger.error('Empty command provided for execution.');
-          logger.error('Provide a command to execute after -e/--execute/--cmd flag.');
-          process.exit(1);
+        // Enhanced command validation
+        if (options.execute) {
+          const commandValidation = validateCommandWithFeedback(options.execute);
+          if (!commandValidation.valid) {
+            logger.error(`Invalid command: ${commandValidation.error}`);
+            if (commandValidation.suggestion) {
+              logger.error(`Suggestion: ${commandValidation.suggestion}`);
+            }
+            process.exit(1);
+          }
+          if (commandValidation.warnings) {
+            commandValidation.warnings.forEach(warning => {
+              logger.warn(`Command warning: ${warning}`);
+            });
+          }
         }
 
-        if (typeof options.testMode === 'number' && options.testMode <= 0) {
-          logger.error('Invalid test mode value. Must be a positive integer (seconds).');
-          logger.error("Example: claude-auto-resume --test-mode 10 -e 'echo test'");
-          process.exit(1);
+        // Enhanced test mode validation
+        if (typeof options.testMode === 'number') {
+          const timeoutValidation = validateTimeoutWithFeedback(options.testMode);
+          if (!timeoutValidation.valid) {
+            logger.error(`Invalid test mode value: ${timeoutValidation.error}`);
+            if (timeoutValidation.suggestion) {
+              logger.error(`Suggestion: ${timeoutValidation.suggestion}`);
+            }
+            process.exit(1);
+          }
+          if (timeoutValidation.suggestion) {
+            logger.warn(`Test mode suggestion: ${timeoutValidation.suggestion}`);
+          }
         }
 
         // Handle system check
@@ -167,10 +196,17 @@ TROUBLESHOOTING:
         // Use positional argument if provided, otherwise use flag or default
         const finalPrompt = promptArg || options.prompt || config.defaultPrompt;
 
-        // Validate prompt
-        if (!validatePrompt(finalPrompt)) {
-          logger.error('Invalid prompt provided');
+        // Enhanced prompt validation
+        const promptValidation = validatePromptWithFeedback(finalPrompt);
+        if (!promptValidation.valid) {
+          logger.error(`Invalid prompt: ${promptValidation.error}`);
+          if (promptValidation.suggestion) {
+            logger.error(`Suggestion: ${promptValidation.suggestion}`);
+          }
           process.exit(1);
+        }
+        if (promptValidation.suggestion) {
+          logger.warn(`Prompt suggestion: ${promptValidation.suggestion}`);
         }
 
         logger.info('Claude Auto Resume - TypeScript Version');
@@ -183,6 +219,11 @@ TROUBLESHOOTING:
 
         if (options.testMode) {
           logger.info(`[DEV] Test mode enabled - simulating ${options.testMode}s wait`);
+        }
+
+        // Debug mode diagnostics
+        if (options.debug) {
+          await showDebugDiagnostics(options, config, finalPrompt);
         }
 
         // Initialize Claude CLI
@@ -258,7 +299,10 @@ async function showSystemCheck(): Promise<void> {
   try {
     const { execSync } = require('child_process');
     const claudeVersion = execSync('claude --version', { encoding: 'utf8', timeout: 5000 }).trim();
+    const currentTime = TimeUtils.getTimeDisplay(TimeUtils.getCurrentTimestamp());
+    
     logger.info(`Claude CLI Version: ${claudeVersion}`);
+    logger.info(`System Time: ${currentTime.absolute} (${currentTime.relative})`);
 
     // Check if --dangerously-skip-permissions is supported
     try {
@@ -291,4 +335,113 @@ async function showSystemCheck(): Promise<void> {
   logger.info('Logging Configuration:');
   logger.info(`  Log Level: ${LogLevel[logger.getLevel()]}`);
   logger.info(`  File Output: ${logger.getLogFile() || 'Console only'}`);
+}
+
+/**
+ * Shows comprehensive debug diagnostics
+ */
+async function showDebugDiagnostics(options: CLIOptions, config: CLIConfig, prompt: string): Promise<void> {
+  logger.debug('=== DEBUG MODE DIAGNOSTICS ===');
+  
+  // Runtime environment
+  logger.debug('Runtime Environment:', {
+    nodeVersion: process.version,
+    platform: process.platform,
+    architecture: process.arch,
+    cwd: process.cwd(),
+    pid: process.pid,
+    uptime: `${Math.floor(process.uptime())}s`,
+    memoryUsage: process.memoryUsage(),
+    argv: process.argv,
+    uid: process.getuid ? process.getuid() : 'N/A',
+    gid: process.getgid ? process.getgid() : 'N/A'
+  });
+
+  // Time information
+  const currentTime = TimeUtils.getTimeDisplay(TimeUtils.getCurrentTimestamp());
+  logger.debug('Time Information:', {
+    current: currentTime.absolute,
+    relative: currentTime.relative,
+    timestamp: TimeUtils.getCurrentTimestamp(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    platformDateInfo: TimeUtils.getPlatformDateInfo()
+  });
+
+  // CLI options and configuration
+  logger.debug('CLI Options:', options);
+  logger.debug('Configuration:', config);
+  logger.debug('Final Prompt Analysis:', {
+    length: prompt.length,
+    trimmedLength: prompt.trim().length,
+    hasSpecialChars: /[<>"|&;`$(){}[\]\\]/.test(prompt),
+    wordCount: prompt.trim().split(/\s+/).length
+  });
+
+  // Environment variables
+  const relevantEnvVars = Object.keys(process.env)
+    .filter(key => key.startsWith('CLAUDE_') || key.includes('NODE') || key.includes('PATH'))
+    .reduce((acc, key) => {
+      acc[key] = process.env[key];
+      return acc;
+    }, {} as Record<string, string | undefined>);
+  
+  logger.debug('Environment Variables:', relevantEnvVars);
+
+  // Network connectivity
+  try {
+    logger.debug('Testing network connectivity...');
+    const connectivityStatus = await NetworkUtils.getConnectivityStatus();
+    logger.debug('Network Connectivity Status:', connectivityStatus);
+  } catch (error) {
+    logger.debug('Network connectivity test failed:', { error });
+  }
+
+  // File system permissions
+  try {
+    const fs = require('fs');
+    const cwd = process.cwd();
+    const isWritable = fs.constants.W_OK;
+    fs.accessSync(cwd, isWritable);
+    logger.debug('File System:', {
+      currentDirectory: cwd,
+      writable: true
+    });
+  } catch (error) {
+    logger.debug('File System:', {
+      currentDirectory: process.cwd(),
+      writable: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+
+  // Claude CLI analysis
+  try {
+    const { execSync } = require('child_process');
+    const claudeVersion = execSync('claude --version', { encoding: 'utf8', timeout: 5000 }).trim();
+    const claudeHelp = execSync('claude --help', { encoding: 'utf8', timeout: 5000 });
+    
+    logger.debug('Claude CLI Analysis:', {
+      version: claudeVersion,
+      path: config.claudeCliPath,
+      helpAvailable: claudeHelp.length > 0,
+      supportsSkipPermissions: claudeHelp.includes('dangerously-skip-permissions'),
+      supportsContinue: claudeHelp.includes('-c') || claudeHelp.includes('--continue')
+    });
+  } catch (error) {
+    logger.debug('Claude CLI Analysis Failed:', { 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      path: config.claudeCliPath
+    });
+  }
+
+  // Performance metrics
+  logger.debug('Performance Metrics:', {
+    startTime: Date.now(),
+    heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+    heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`,
+    external: `${Math.round(process.memoryUsage().external / 1024 / 1024)}MB`,
+    cpuUsage: process.cpuUsage()
+  });
+
+  logger.debug('=== END DEBUG DIAGNOSTICS ===');
 }

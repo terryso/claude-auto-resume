@@ -212,7 +212,7 @@ export class TimeUtils {
   }
 
   /**
-   * Waits for the specified duration with a live countdown display
+   * Waits for the specified duration with a live countdown display and progress bar
    * Includes interrupt handling for graceful termination
    */
   static async waitWithCountdown(seconds: number, onInterrupt?: () => void): Promise<void> {
@@ -220,11 +220,13 @@ export class TimeUtils {
 
     let remaining = seconds;
     let interrupted = false;
+    const progressBar = createProgressBar(seconds);
 
     // Set up interrupt handler
     const handleInterrupt = () => {
       interrupted = true;
-      process.stdout.write('\n[INFO] Interrupt received. Exiting gracefully...\n');
+      progressBar.stop();
+      logger.info('Interrupt received. Exiting gracefully...');
       if (onInterrupt) {
         onInterrupt();
       }
@@ -235,19 +237,34 @@ export class TimeUtils {
     process.on('SIGTERM', handleInterrupt);
 
     try {
-      console.log(`[INFO] Waiting ${TimeUtils.formatDuration(seconds)} until resume time...`);
-      console.log('[INFO] Press Ctrl+C to interrupt and exit');
+      const timeDisplay = TimeUtils.getTimeDisplay(Date.now() / 1000 + seconds);
+      
+      logger.info('Starting countdown timer', {
+        duration: TimeUtils.formatDuration(seconds),
+        resumeTime: timeDisplay.absolute,
+        relative: timeDisplay.relative
+      });
+      
+      progressBar.start(`Waiting ${TimeUtils.formatDuration(seconds)} until resume time. Press Ctrl+C to interrupt.`);
 
       while (remaining > 0 && !interrupted) {
-        const countdown = TimeUtils.formatCountdown(remaining);
-        process.stdout.write(`\r[COUNTDOWN] Time remaining: ${countdown}`);
+        const elapsed = seconds - remaining;
+        const timeDisplay = TimeUtils.getTimeDisplay(Date.now() / 1000 + remaining);
+        
+        progressBar.updateProgress(elapsed);
+        progressBar.update(
+          `${TimeUtils.formatDurationShort(remaining)} remaining (Resume ${timeDisplay.relative}). Press Ctrl+C to interrupt.`
+        );
 
         await new Promise((resolve) => setTimeout(resolve, 1000));
         remaining--;
       }
 
       if (!interrupted) {
-        process.stdout.write('\n[INFO] Wait period completed. Resuming...\n');
+        progressBar.succeed('Wait period completed. Resuming Claude session...');
+        logger.info('Countdown completed successfully', {
+          duration: TimeUtils.formatDuration(seconds)
+        });
       }
     } finally {
       // Clean up interrupt handlers
@@ -262,9 +279,11 @@ export class TimeUtils {
   static applyWaitBuffer(waitSeconds: number, bufferSeconds: number): number {
     const total = waitSeconds + bufferSeconds;
     if (bufferSeconds > 0) {
-      console.log(
-        `[INFO] Applied wait buffer: +${bufferSeconds}s (total: ${TimeUtils.formatDuration(total)})`
-      );
+      logger.info('Applied wait buffer', {
+        bufferSeconds,
+        originalDuration: TimeUtils.formatDuration(waitSeconds),
+        totalDuration: TimeUtils.formatDuration(total)
+      });
     }
     return total;
   }
