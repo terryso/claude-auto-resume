@@ -114,12 +114,16 @@ describe('NetworkUtils Simple', () => {
 
     describe('checkConnectivityPing', () => {
       it('should handle successful ping on Unix', async () => {
+        // Use fake timers for this test to avoid open handles
+        jest.useFakeTimers();
+        
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              process.nextTick(() => callback(0));
+              // Use setImmediate to avoid timer issues
+              setImmediate(() => callback(0));
             }
           }),
           kill: jest.fn(),
@@ -130,7 +134,12 @@ describe('NetworkUtils Simple', () => {
         // Mock platform to Unix
         Object.defineProperty(process, 'platform', { value: 'linux' });
 
-        const result = await NetworkUtils.checkConnectivityPing('8.8.8.8');
+        const resultPromise = NetworkUtils.checkConnectivityPing('8.8.8.8');
+        
+        // Run all timers to complete the test
+        jest.runAllTimers();
+        
+        const result = await resultPromise;
 
         expect(spawn).toHaveBeenCalledWith(
           'ping',
@@ -138,15 +147,19 @@ describe('NetworkUtils Simple', () => {
           expect.any(Object)
         );
         expect(typeof result).toBe('object');
+        
+        jest.useRealTimers();
       });
 
       it('should handle successful ping on Windows', async () => {
+        jest.useFakeTimers();
+        
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              process.nextTick(() => callback(0));
+              setImmediate(() => callback(0));
             }
           }),
           kill: jest.fn(),
@@ -157,7 +170,9 @@ describe('NetworkUtils Simple', () => {
         // Mock platform to Windows
         Object.defineProperty(process, 'platform', { value: 'win32' });
 
-        const result = await NetworkUtils.checkConnectivityPing('8.8.8.8');
+        const resultPromise = NetworkUtils.checkConnectivityPing('8.8.8.8');
+        jest.runAllTimers();
+        const result = await resultPromise;
 
         expect(spawn).toHaveBeenCalledWith(
           'ping',
@@ -165,9 +180,13 @@ describe('NetworkUtils Simple', () => {
           expect.any(Object)
         );
         expect(typeof result).toBe('object');
+        
+        jest.useRealTimers();
       });
 
       it('should handle ping failure', async () => {
+        jest.useFakeTimers();
+        
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: {
@@ -179,7 +198,7 @@ describe('NetworkUtils Simple', () => {
           },
           on: jest.fn((event, callback) => {
             if (event === 'close') {
-              process.nextTick(() => callback(1));
+              setImmediate(() => callback(1));
             }
           }),
           kill: jest.fn(),
@@ -187,19 +206,25 @@ describe('NetworkUtils Simple', () => {
 
         spawn.mockReturnValue(mockChild);
 
-        const result = await NetworkUtils.checkConnectivityPing('192.0.2.1');
+        const resultPromise = NetworkUtils.checkConnectivityPing('192.0.2.1');
+        jest.runAllTimers();
+        const result = await resultPromise;
 
         expect(typeof result).toBe('object');
         expect(result.connected).toBe(false);
+        
+        jest.useRealTimers();
       });
 
       it('should handle ping command error', async () => {
+        jest.useFakeTimers();
+        
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'error') {
-              process.nextTick(() => callback(new Error('Command not found')));
+              setImmediate(() => callback(new Error('Command not found')));
             }
           }),
           kill: jest.fn(),
@@ -207,10 +232,14 @@ describe('NetworkUtils Simple', () => {
 
         spawn.mockReturnValue(mockChild);
 
-        const result = await NetworkUtils.checkConnectivityPing('8.8.8.8');
+        const resultPromise = NetworkUtils.checkConnectivityPing('8.8.8.8');
+        jest.runAllTimers();
+        const result = await resultPromise;
 
         expect(typeof result).toBe('object');
         expect(result.connected).toBe(false);
+        
+        jest.useRealTimers();
       });
     });
 

@@ -226,6 +226,8 @@ describe('ClaudeCLI Simple', () => {
       });
 
       it('should handle ENOENT error (CLI not found)', async () => {
+        jest.useFakeTimers();
+        
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: { on: jest.fn() },
@@ -233,7 +235,7 @@ describe('ClaudeCLI Simple', () => {
             if (event === 'error') {
               const error = new Error('spawn claude ENOENT');
               error.message = 'spawn claude ENOENT';
-              process.nextTick(() => callback(error));
+              setImmediate(() => callback(error));
             }
           }),
           kill: jest.fn(),
@@ -241,18 +243,25 @@ describe('ClaudeCLI Simple', () => {
 
         spawn.mockReturnValue(mockChild);
 
-        await expect(claudeCli.executeClaudeCommand(['-p', 'test'])).rejects.toThrow(
+        const errorPromise = claudeCli.executeClaudeCommand(['-p', 'test']);
+        jest.runAllTimers();
+        
+        await expect(errorPromise).rejects.toThrow(
           'Claude CLI not found in PATH'
         );
+        
+        jest.useRealTimers();
       });
 
       it('should handle generic error', async () => {
+        jest.useFakeTimers();
+        
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: { on: jest.fn() },
           on: jest.fn((event, callback) => {
             if (event === 'error') {
-              process.nextTick(() => callback(new Error('Generic error')));
+              setImmediate(() => callback(new Error('Generic error')));
             }
           }),
           kill: jest.fn(),
@@ -260,31 +269,38 @@ describe('ClaudeCLI Simple', () => {
 
         spawn.mockReturnValue(mockChild);
 
-        await expect(claudeCli.executeClaudeCommand(['-p', 'test'])).rejects.toThrow(
+        const errorPromise = claudeCli.executeClaudeCommand(['-p', 'test']);
+        jest.runAllTimers();
+        
+        await expect(errorPromise).rejects.toThrow(
           'Claude CLI execution error: Generic error'
         );
+        
+        jest.useRealTimers();
       });
 
       it('should handle command timeout', async () => {
+        // Use fake timers only for this test
+        jest.useFakeTimers();
+        
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: { on: jest.fn() },
-          on: jest.fn(),
+          on: jest.fn(), // Don't trigger close event, let timeout happen
           kill: jest.fn(),
         };
 
         spawn.mockReturnValue(mockChild);
 
+        // Start the command execution with short timeout
         const timeoutPromise = claudeCli.executeClaudeCommand(['-p', 'test'], 100);
 
-        // Advance time to trigger timeout
-        jest.useFakeTimers();
-        setTimeout(() => {
-          jest.advanceTimersByTime(100);
-        }, 10);
+        // Advance time past the timeout to trigger it
+        jest.advanceTimersByTime(100);
 
         await expect(timeoutPromise).rejects.toThrow('Claude CLI command timed out');
-
+        expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+        
         jest.useRealTimers();
       });
 

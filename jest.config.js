@@ -32,6 +32,6 @@ module.exports = {
   maxConcurrency: 4,
   // Prevent test hanging and reduce noise from expected timeouts
   forceExit: true,
-  detectOpenHandles: false,  // Disable to reduce noise from expected setTimeout usage
+  detectOpenHandles: true,  // Re-enable to help identify real issues
   silent: false
 };
