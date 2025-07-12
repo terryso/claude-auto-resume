@@ -23,12 +23,17 @@ describe('CLI Commands', () => {
 
   it('should have version command', async () => {
     await setupCLI(program);
-    expect(program.version()).toBe('1.0.0');
+    expect(program.version()).toBe('1.3.0');
   });
 
-  it('should have help command', async () => {
+  it('should have expected options', async () => {
     await setupCLI(program);
-    const commands = program.commands.map((cmd) => cmd.name());
-    expect(commands).toContain('help');
+    const options = program.options.map((opt) => opt.long);
+    expect(options).toContain('--prompt');
+    expect(options).toContain('--continue');
+    expect(options).toContain('--execute');
+    expect(options).toContain('--cmd');
+    expect(options).toContain('--test-mode');
+    expect(options).toContain('--check');
   });
 });

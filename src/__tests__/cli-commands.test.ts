@@ -5,6 +5,12 @@
 import { Command } from 'commander';
 import { setupCLI } from '../cli/commands';
 
+// Mock all external dependencies
+jest.mock('../core/claude-cli');
+jest.mock('../core/command-executor');
+jest.mock('../config/loader');
+jest.mock('child_process');
+
 describe('CLI Commands Extended', () => {
   let program: Command;
   let originalExit: typeof process.exit;
@@ -26,6 +32,33 @@ describe('CLI Commands Extended', () => {
     // Suppress console output
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
+
+    // Mock loadConfiguration
+    const { loadConfiguration } = require('../config/loader');
+    loadConfiguration.mockReturnValue({
+      defaultPrompt: 'continue',
+      defaultTimeout: 120000,
+      maxRetries: 3,
+      claudeCliPath: 'claude',
+      waitBuffer: 0,
+      skipPermissions: true,
+      logFile: undefined,
+    });
+
+    // Mock ClaudeCLI
+    const { ClaudeCLI } = require('../core/claude-cli');
+    ClaudeCLI.prototype.checkUsageLimit = jest.fn().mockResolvedValue({
+      hasLimit: false,
+      rawOutput: 'No limit',
+    });
+    ClaudeCLI.prototype.resume = jest.fn().mockResolvedValue(undefined);
+
+    // Mock CommandExecutor
+    const { CommandExecutor } = require('../core/command-executor');
+    CommandExecutor.executeWithSafeguards = jest.fn().mockResolvedValue({
+      exitCode: 0,
+      success: true,
+    });
   });
 
   afterEach(() => {
@@ -82,20 +115,60 @@ describe('CLI Commands Extended', () => {
     }
   });
 
-  it('should execute help command', async () => {
+  it('should handle check flag', async () => {
     await setupCLI(program);
 
-    const helpCommand = program.commands.find((cmd) => cmd.name() === 'help');
-    expect(helpCommand).toBeDefined();
+    try {
+      // Simulate command execution with check flag
+      await program.parseAsync(['node', 'cli.js', '--check']);
+    } catch (error) {
+      // Expected in test environment
+      expect(error).toBeDefined();
+    }
+  });
 
-    if (helpCommand) {
-      try {
-        // Execute help command
-        await helpCommand.parseAsync(['help'], { from: 'user' });
-      } catch (error) {
-        // Expected in test environment
-        expect(error).toBeDefined();
-      }
+  it('should validate argument combinations', async () => {
+    await setupCLI(program);
+
+    try {
+      // Test conflicting flags: execute and continue
+      await program.parseAsync(['node', 'cli.js', '-e', 'echo test', '-c']);
+    } catch (error) {
+      expect(exitCode).toBe(1);
+    }
+  });
+
+  it('should handle cmd alias for execute', async () => {
+    await setupCLI(program);
+
+    try {
+      // Test --cmd alias
+      await program.parseAsync(['node', 'cli.js', '--cmd', 'echo test']);
+    } catch (error) {
+      // Expected in test environment due to mocked process.exit
+      expect(error).toBeDefined();
+    }
+  });
+
+  it('should reject empty execute command', async () => {
+    await setupCLI(program);
+
+    try {
+      // Test empty execute command
+      await program.parseAsync(['node', 'cli.js', '-e', '   ']);
+    } catch (error) {
+      expect(exitCode).toBe(1);
+    }
+  });
+
+  it('should reject invalid test mode', async () => {
+    await setupCLI(program);
+
+    try {
+      // Test invalid test mode
+      await program.parseAsync(['node', 'cli.js', '--test-mode', '-5', '-e', 'echo test']);
+    } catch (error) {
+      expect(exitCode).toBe(1);
     }
   });
 

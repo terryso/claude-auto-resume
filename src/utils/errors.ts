@@ -17,6 +17,39 @@ export class CLIError extends Error {
 }
 
 /**
+ * Structured error class for Claude Auto Resume application
+ * Matches shell script error handling with specific exit codes
+ */
+export class ClaudeAutoResumeError extends Error {
+  constructor(
+    message: string,
+    public readonly exitCode: number,
+    public readonly context?: string,
+    public readonly hint?: string
+  ) {
+    super(message);
+    this.name = 'ClaudeAutoResumeError';
+  }
+
+  /**
+   * Formats error message with context and hints
+   */
+  getFormattedMessage(): string {
+    let formatted = `[ERROR] ${this.message}`;
+    
+    if (this.context) {
+      formatted += `\n[DEBUG] ${this.context}`;
+    }
+    
+    if (this.hint) {
+      formatted += `\n[HINT] ${this.hint}`;
+    }
+    
+    return formatted;
+  }
+}
+
+/**
  * Creates a standardized error object
  */
 export function createError(message: string, code: string, exitCode = 1): CLIError {

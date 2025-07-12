@@ -8,7 +8,23 @@
 import { program } from 'commander';
 import { setupCLI } from './cli/commands';
 
-async function main(): Promise<void> {
+// Export core modules
+export { ClaudeCLI } from './core/claude-cli';
+export { TimeUtils } from './core/time-utils';
+export { NetworkUtils } from './core/network';
+export { CommandExecutor } from './core/command-executor';
+
+// Export configuration
+export { loadConfiguration } from './config/loader';
+
+// Export utilities
+export { 
+  logger,
+  validatePrompt,
+  ClaudeAutoResumeError
+} from './utils';
+
+export async function main(): Promise<void> {
   try {
     await setupCLI(program);
     await program.parseAsync(process.argv);
@@ -18,8 +34,10 @@ async function main(): Promise<void> {
   }
 }
 
-// Execute main function
-main().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Execute main function only when run directly
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}

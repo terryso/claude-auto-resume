@@ -2,6 +2,7 @@
  * Core business logic module
  */
 
-export { ClaudeCLI } from './claude-cli';
+export { ClaudeCLI, UsageLimitResult } from './claude-cli';
 export { TimeUtils } from './time-utils';
-export { NetworkUtils } from './network';
+export { NetworkUtils, ConnectivityResult } from './network';
+export { CommandExecutor, CommandExecutionResult } from './command-executor';

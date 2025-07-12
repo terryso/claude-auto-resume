@@ -39,11 +39,13 @@ describe('Integration Tests', () => {
       await setupCLI(program);
 
       expect(program.name()).toBe('claude-auto-resume');
-      expect(program.version()).toBe('1.0.0');
+      expect(program.version()).toBe('1.3.0');
 
-      // Verify commands exist
-      const commands = program.commands.map((cmd) => cmd.name());
-      expect(commands).toContain('help');
+      // Verify options exist
+      const options = program.options.map((opt) => opt.long);
+      expect(options).toContain('--prompt');
+      expect(options).toContain('--continue');
+      expect(options).toContain('--execute');
     });
 
     it('should handle valid prompt execution', async () => {
@@ -70,12 +72,14 @@ describe('Integration Tests', () => {
       }
     });
 
-    it('should handle help command', async () => {
+    it('should handle built-in help functionality', async () => {
       await setupCLI(program);
 
-      const helpCommand = program.commands.find((cmd) => cmd.name() === 'help');
-      expect(helpCommand).toBeDefined();
-      expect(helpCommand?.description()).toBe('Show help information');
+      // Test that help text is available
+      const helpInfo = program.helpInformation();
+      expect(helpInfo).toContain('claude-auto-resume');
+      expect(helpInfo).toContain('--prompt');
+      expect(helpInfo).toContain('--continue');
     });
   });
 
