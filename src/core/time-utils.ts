@@ -349,7 +349,8 @@ export class TimeUtils {
       }
 
       if (!interrupted) {
-        process.stdout.write('\r✅ Wait period completed. Resuming Claude session...           \n');
+        // Clear the countdown line and show completion message
+        process.stdout.write('\r\x1b[K✅ Wait period completed. Resuming Claude session...\n');
         logger.info('Wait period completed, resuming...');
       }
     } finally {

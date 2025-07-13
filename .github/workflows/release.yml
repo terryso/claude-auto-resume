@@ -131,13 +131,27 @@ jobs:
             
             # If no specific version found, use a default message
             if [ -z "$CHANGELOG_CONTENT" ]; then
-              CHANGELOG_CONTENT="### 🚀 Claude Auto Resume ${{ steps.get_version.outputs.VERSION }}\n\nThis release includes bug fixes, performance improvements and new features.\n\nSee [CHANGELOG.md](https://github.com/terryso/claude-auto-resume/blob/main/CHANGELOG.md) for detailed changes."
+              CHANGELOG_CONTENT="## 🚀 Claude Auto Resume ${{ steps.get_version.outputs.VERSION }}
+
+This release includes bug fixes, performance improvements and new features.
+
+See [CHANGELOG.md](https://github.com/terryso/claude-auto-resume/blob/main/CHANGELOG.md) for detailed changes."
             else
               # Add header to the extracted content
-              CHANGELOG_CONTENT="## 🚀 Claude Auto Resume ${{ steps.get_version.outputs.VERSION }}\n\n$CHANGELOG_CONTENT\n\n---\n\n📋 **View full changelog**: [CHANGELOG.md](https://github.com/terryso/claude-auto-resume/blob/develop/CHANGELOG.md)\n\n⚠️ **Security Notice**: Uses \`--dangerously-skip-permissions\` flag by default. Only use in trusted environments."
+              CHANGELOG_CONTENT="## 🚀 Claude Auto Resume ${{ steps.get_version.outputs.VERSION }}
+
+$CHANGELOG_CONTENT
+
+---
+
+📋 **View full changelog**: [CHANGELOG.md](https://github.com/terryso/claude-auto-resume/blob/develop/CHANGELOG.md)
+
+⚠️ **Security Notice**: Uses \`--dangerously-skip-permissions\` flag by default. Only use in trusted environments."
             fi
           else
-            CHANGELOG_CONTENT="### 🚀 Claude Auto Resume ${{ steps.get_version.outputs.VERSION }}\n\nThis release includes improvements and bug fixes."
+            CHANGELOG_CONTENT="## 🚀 Claude Auto Resume ${{ steps.get_version.outputs.VERSION }}
+
+This release includes improvements and bug fixes."
           fi
           
           # Output the changelog content for the release

@@ -13,9 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.8] - 2025-07-13
 
-### Changed
-- Version bump for release
-- Bug fixes and improvements
+### Fixed
+- **Unlimited Execution Time**: Removed 5-minute timeout limit in CommandExecutor to match shell script behavior
+- **Claude CLI Compatibility**: TypeScript version now waits indefinitely for Claude operations like the original shell script
+- **Test Coverage**: Updated related tests to reflect unlimited execution time changes
+
+### Technical Details
+- Changed `MAX_EXECUTION_TIME_MS` from 300000 (5 minutes) to 0 (unlimited)
+- Modified `executeCustomCommand` to only set timeout when > 0
+- Updated log messages to indicate unlimited execution time
+- Ensures 100% feature parity with shell script execution behavior
 
 
 ## [2.0.7] - 2025-07-13

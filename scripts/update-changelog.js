@@ -58,15 +58,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
   const insertPosition = match.index + match[0].length;
   
-  // Create new version entry
+  // Create new version entry with better default content
   const today = new Date().toISOString().split('T')[0];
   const newEntry = `
 
 ## [${newVersion}] - ${today}
 
 ### Changed
-- Version bump for release
-- Bug fixes and improvements
+- Performance improvements and bug fixes
+- Enhanced stability and compatibility
+
+### Notes
+- See commit history for detailed changes
+- Maintains 100% backward compatibility
 
 `;
   
