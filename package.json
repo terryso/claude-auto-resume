@@ -1,6 +1,6 @@
 {
   "name": "claude-auto-resume",
-  "version": "2.0.3-test.0",
+  "version": "2.0.3",
   "description": "Automatically resumes Claude CLI tasks when usage limits are lifted. Supports both npm install and npx usage. TypeScript-based with comprehensive tooling.",
   "main": "dist/index.js",
   "bin": {
