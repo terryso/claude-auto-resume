@@ -76,9 +76,9 @@ export class ClaudeCLI {
             stdio: ['inherit', 'pipe', 'pipe'], // Inherit stdin, pipe stdout/stderr
           });
 
-
           resolve(result);
         } catch (error: any) {
+          // console.log('error: ', error.stdout);
           if (error.status === null) {
             // Timeout or signal
             reject(
@@ -99,7 +99,7 @@ export class ClaudeCLI {
           } else {
             reject(
               new ClaudeAutoResumeError(
-                `Claude CLI execution failed with exit code ${error.status || 'unknown'}`,
+                `${error.stdout}`,
                 1,
                 `Command: ${command}\\nStderr: ${error.stderr || ''}\\nError: ${error.message}`
               )
@@ -111,13 +111,11 @@ export class ClaudeCLI {
     if (showProgress) {
       const message = `Executing Claude CLI command: ${args.join(' ')}`;
       const result = await withSpinner(operation, message, 'dots');
-      
       // Output debug info after spinner completes
       if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
         logger.debug(`Executing with shell: ${this.cliPath} ${args.join(' ')}`);
         logger.debug(`Working directory: ${process.cwd()}`);
       }
-      
       return result;
     } else {
       return operation();
@@ -194,7 +192,7 @@ export class ClaudeCLI {
       return this.parseUsageLimitOutput(output);
     } catch (error) {
       if (error instanceof ClaudeAutoResumeError) {
-        throw error;
+        return this.parseUsageLimitOutput(error.message);
       }
       throw new ClaudeAutoResumeError(
         `Failed to check Claude usage limit: ${error}`,
