@@ -57,7 +57,7 @@ export class ClaudeCLI {
           return JSON.stringify(arg);
         });
 
-        const command = `${this.cliPath} ${quotedArgs.join(' ')}`;
+        const command = `${this.cliPath} ${args.join(' ')}`;
 
         if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
           console.debug(`[DEBUG] Executing with shell: ${command}`);
@@ -179,7 +179,8 @@ export class ClaudeCLI {
    */
   async checkUsageLimit(): Promise<UsageLimitResult> {
     try {
-      const output = await this.executeClaudeCommand(['--print', 'check']);
+      const args = this.buildClaudeCommand('check', false, false);
+      const output = await this.executeClaudeCommand(args);
       return this.parseUsageLimitOutput(output);
     } catch (error) {
       if (error instanceof ClaudeAutoResumeError) {
@@ -208,7 +209,7 @@ export class ClaudeCLI {
     }
 
     // Add -p flag for print mode and prompt as positional argument
-    args.push('-p', prompt);
+    args.push('-p', `"${prompt}"`);
     return args;
   }
 
