@@ -20,35 +20,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.15] - 2025-07-13
 
-### Changed
-- Performance improvements and bug fixes
-- Enhanced stability and compatibility
+### Fixed
+- Remove timeout limit for Claude resume operations to prevent ETIMEDOUT errors
+- Keep reasonable timeout (3 minutes) for usage limit check operations
+- Update unit tests to handle new timeout parameter
+- Fix long-running Claude tasks being interrupted unexpectedly
 
-### Notes
-- See commit history for detailed changes
-- Maintains 100% backward compatibility
+### Changed
+- Conditional timeout setting in executeClaudeCommand() method
+- Improved error messages to distinguish timeout vs signal interruption
 
 
 ## [2.0.14] - 2025-07-13
 
-### Changed
-- Performance improvements and bug fixes
-- Enhanced stability and compatibility
+### Fixed
+- Fix debug output formatting in TypeScript version
+- Debug messages no longer overlap with spinner progress indicators
+- Debug output only appears when --debug flag is used (not by default)
+- Remove extra newlines in debug output for cleaner display
 
-### Notes
-- See commit history for detailed changes
-- Maintains 100% backward compatibility
+### Changed
+- Move debug output after spinner completion
+- Use logger.debug() instead of console.debug() for proper level control
 
 
 ## [2.0.13] - 2025-07-13
 
-### Changed
-- Performance improvements and bug fixes
-- Enhanced stability and compatibility
-
-### Notes
-- See commit history for detailed changes
-- Maintains 100% backward compatibility
+### Fixed
+- Fix bug where script would stop running when "Claude AI usage limit reached" message appears
+- Update package name synchronization in package-lock.json
+- Fix indentation and control flow issues in CLI commands
 
 
 ## [2.0.12] - 2025-07-13

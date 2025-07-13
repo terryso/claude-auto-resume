@@ -58,15 +58,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
   const insertPosition = match.index + match[0].length;
   
-  // Create new version entry with better default content
+  // Create new version entry with git commit analysis
   const today = new Date().toISOString().split('T')[0];
+  
+  // Try to generate changelog from recent commits
+  let changelogContent = '### Changed\n- Performance improvements and bug fixes\n- Enhanced stability and compatibility';
+  
+  try {
+    const { execSync } = require('child_process');
+    // Get commits since last tag or last 5 commits
+    const lastTagCommand = 'git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~5"';
+    const lastTag = execSync(lastTagCommand, { encoding: 'utf8' }).trim();
+    const sinceRef = lastTag === 'HEAD~5' ? 'HEAD~5' : `${lastTag}..HEAD`;
+    
+    const commits = execSync(`git log ${sinceRef} --pretty=format:"%s" --no-merges`, { 
+      encoding: 'utf8' 
+    }).trim();
+    
+    if (commits) {
+      const commitLines = commits.split('\n').filter(line => line.trim());
+      const changes = commitLines.map(commit => {
+        // Clean up commit message and categorize
+        let message = commit.trim();
+        
+        // Remove common prefixes and clean up
+        message = message.replace(/^(fix|feat|chore|docs|style|refactor|test):\s*/i, '');
+        message = message.replace(/🤖 Generated with.*$/gm, '');
+        message = message.replace(/Co-Authored-By:.*$/gm, '');
+        message = message.trim();
+        
+        if (message) {
+          return `- ${message}`;
+        }
+        return null;
+      }).filter(Boolean);
+      
+      if (changes.length > 0) {
+        changelogContent = changes.join('\n');
+      }
+    }
+  } catch (error) {
+    console.log('Could not analyze git commits, using default changelog entry');
+  }
+  
   const newEntry = `
 
 ## [${newVersion}] - ${today}
 
-### Changed
-- Performance improvements and bug fixes
-- Enhanced stability and compatibility
+${changelogContent}
 
 ### Notes
 - See commit history for detailed changes
