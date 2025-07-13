@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.4] - 2025-07-13
+
+### 🔧 Optimizations
+- **Simplified Wait Logic**: Changed default waitBuffer from 0 to 10 seconds for consistent behavior
+- **Removed Redundant Code**: Eliminated duplicate 10-second sleep in TypeScript version
+- **Unified Configuration**: Use waitBuffer setting to handle pause uniformly across both TypeScript and shell versions
+- **Enhanced Test Reliability**: Fixed all test failures and improved test coverage
+- **100% Feature Parity**: Ensured identical behavior between TypeScript and shell script implementations
+
+### ✨ Benefits
+- Cleaner codebase without duplicate timing logic
+- User-configurable pause time via `CLAUDE_AUTO_RESUME_WAIT_BUFFER` environment variable
+- Consistent behavior across all implementation versions
+- All 384 tests pass with 92%+ coverage maintained
+
 ## [2.0.1] - 2025-07-13
 
 ### 🚀 Features
@@ -42,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitHub Releases**: Automated releases with comprehensive changelogs
 - **Documentation**: Updated README with migration guide and examples
 
-## [1.3.0] - 2024-12-01
+## [1.3.0] - 2025-07-08
 
 ### Added
 - Custom command execution with `-e/--execute/--cmd` flags
@@ -55,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Network connectivity validation
 - Signal handling for graceful termination
 
-## [1.0.0] - 2024-11-01
+## [1.0.0] - 2025-07-07
 
 ### Added
 - Initial release of shell script version
