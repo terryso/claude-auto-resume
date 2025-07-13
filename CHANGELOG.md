@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [2.0.16] - 2025-07-13
+
+- Improve CHANGELOG.md with accurate version descriptions
+- Remove timeout limit for Claude resume operations
+
+### Notes
+- See commit history for detailed changes
+- Maintains 100% backward compatibility
+
+
 ## [2.0.15] - 2025-07-13
 
 ### Fixed
