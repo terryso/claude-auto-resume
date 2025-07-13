@@ -92,7 +92,7 @@ jobs:
           
           # Extract the changelog content for this version
           if [ -f "CHANGELOG.md" ]; then
-            # Find the section for this version and extract content until next version or end
+            # First try to find the exact version
             CHANGELOG_CONTENT=$(awk -v version="$VERSION_NUMBER" '
               BEGIN { in_version = 0; content = "" }
               /^## \[/ {
@@ -109,6 +109,26 @@ jobs:
               END { print content }
             ' CHANGELOG.md)
             
+            # If no exact match found, use the latest version (first non-Unreleased entry)
+            if [ -z "$CHANGELOG_CONTENT" ]; then
+              CHANGELOG_CONTENT=$(awk '
+                BEGIN { in_version = 0; content = ""; found_version = 0 }
+                /^## \[/ {
+                  if (in_version) exit
+                  if ($0 !~ "Unreleased" && !found_version) {
+                    in_version = 1
+                    found_version = 1
+                    next
+                  }
+                }
+                in_version && !/^## \[/ { 
+                  if (content) content = content "\n" $0
+                  else content = $0
+                }
+                END { print content }
+              ' CHANGELOG.md)
+            fi
+            
             # If no specific version found, use a default message
             if [ -z "$CHANGELOG_CONTENT" ]; then
               CHANGELOG_CONTENT="### 🚀 Claude Auto Resume ${{ steps.get_version.outputs.VERSION }}
@@ -124,7 +144,7 @@ $CHANGELOG_CONTENT
 
 ---
 
-📋 **View full changelog**: [CHANGELOG.md](https://github.com/terryso/claude-auto-resume/blob/main/CHANGELOG.md)
+📋 **View full changelog**: [CHANGELOG.md](https://github.com/terryso/claude-auto-resume/blob/develop/CHANGELOG.md)
 
 ⚠️ **Security Notice**: Uses \`--dangerously-skip-permissions\` flag by default. Only use in trusted environments."
             fi

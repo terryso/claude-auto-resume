@@ -23,7 +23,7 @@
     "format:check": "prettier --check src/**/*.ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build:prod && npm run test",
-    "version": "npm run build:prod",
+    "version": "npm run build:prod && node scripts/update-changelog.js",
     "postversion": "git push && git push --tags",
     "release:patch": "npm version patch",
     "release:minor": "npm version minor",
