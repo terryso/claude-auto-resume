@@ -27,7 +27,7 @@ export interface CommandExecutionResult {
  */
 export class CommandExecutor {
   private static readonly SECURITY_COUNTDOWN_SECONDS = 5;
-  private static readonly MAX_EXECUTION_TIME_MS = 300000; // 5 minutes
+  private static readonly MAX_EXECUTION_TIME_MS = 0; // No timeout - wait indefinitely like shell script
 
   /**
    * Displays security warning and countdown before command execution
@@ -72,16 +72,26 @@ export class CommandExecutor {
 
     console.log(`[INFO] Starting command execution: ${command}`);
     console.log(`[INFO] Start time: ${timeDisplay.absolute} (${timeDisplay.relative})`);
-    console.log(
-      `[INFO] Maximum execution time: ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`
-    );
+    if (timeout > 0) {
+      console.log(
+        `[INFO] Maximum execution time: ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`
+      );
+    } else {
+      console.log('[INFO] Maximum execution time: Unlimited (like shell script)');
+    }
 
     return new Promise((resolve) => {
       // Use shell to support complex commands with pipes and redirections
-      const child = spawn('sh', ['-c', command], {
+      const spawnOptions: any = {
         stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: timeout,
-      });
+      };
+
+      // Only set timeout if it's greater than 0 (unlimited execution like shell script)
+      if (timeout > 0) {
+        spawnOptions.timeout = timeout;
+      }
+
+      const child = spawn('sh', ['-c', command], spawnOptions);
 
       let stdout = '';
       let stderr = '';
@@ -162,33 +172,40 @@ export class CommandExecutor {
         });
       });
 
-      // Timeout handler
-      const timeoutHandle = setTimeout(() => {
-        timedOut = true;
-        child.kill('SIGTERM');
+      // Timeout handler - only set up if timeout > 0
+      let timeoutHandle: NodeJS.Timeout | undefined;
+      if (timeout > 0) {
+        timeoutHandle = setTimeout(() => {
+          timedOut = true;
+          child.kill('SIGTERM');
 
-        console.log(
-          `\n[WARNING] Command execution timed out after ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`
-        );
-        console.log('[INFO] Sending SIGTERM to process...');
+          console.log(
+            `\n[WARNING] Command execution timed out after ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`
+          );
+          console.log('[INFO] Sending SIGTERM to process...');
 
-        // Force kill after additional 5 seconds
-        setTimeout(() => {
-          child.kill('SIGKILL');
-          console.log('[WARNING] Force killing process (SIGKILL)');
-        }, 5000);
-      }, timeout);
+          // Force kill after additional 5 seconds
+          setTimeout(() => {
+            child.kill('SIGKILL');
+            console.log('[WARNING] Force killing process (SIGKILL)');
+          }, 5000);
+        }, timeout);
 
-      // Clean up timeout when process ends
-      child.on('close', () => {
-        clearTimeout(timeoutHandle);
-      });
+        // Clean up timeout when process ends
+        child.on('close', () => {
+          if (timeoutHandle) {
+            clearTimeout(timeoutHandle);
+          }
+        });
+      }
 
       // Handle user interruption (Ctrl+C)
       const handleInterrupt = () => {
         console.log('\n[INFO] User interrupt received. Terminating command...');
         child.kill('SIGINT');
-        clearTimeout(timeoutHandle);
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
       };
 
       process.on('SIGINT', handleInterrupt);

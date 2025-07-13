@@ -292,7 +292,7 @@ describe('CommandExecutor Simple', () => {
     it('should validate constants are defined', () => {
       // Test that the class has the expected constants
       expect(CommandExecutor['SECURITY_COUNTDOWN_SECONDS']).toBe(5);
-      expect(CommandExecutor['MAX_EXECUTION_TIME_MS']).toBe(300000);
+      expect(CommandExecutor['MAX_EXECUTION_TIME_MS']).toBe(0);
     });
 
     it('should handle error cases in executeWithSafeguards', async () => {
