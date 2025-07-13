@@ -5,6 +5,7 @@
 import { execSync } from 'child_process';
 import { ClaudeAutoResumeError } from '../utils/errors';
 import { withSpinner } from '../utils/progress';
+import { logger } from '../utils';
 
 /**
  * Interface for usage limit result parsing
@@ -45,8 +46,8 @@ export class ClaudeCLI {
     };
 
     if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
-      console.debug(`[DEBUG] Proxy settings: ${JSON.stringify(proxyVars)}`);
-      console.debug(`[DEBUG] Executing: ${this.cliPath} ${args.join(' ')}`);
+      logger.debug(`Proxy settings: ${JSON.stringify(proxyVars)}`);
+      logger.debug(`Executing: ${this.cliPath} ${args.join(' ')}`);
     }
 
     const operation = () =>
@@ -64,11 +65,6 @@ export class ClaudeCLI {
 
         const command = `${this.cliPath} ${quotedArgs.join(' ')}`;
 
-        if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
-          console.debug(`[DEBUG] Executing with shell: ${command}`);
-          console.debug(`[DEBUG] Working directory: ${process.cwd()}`);
-        }
-
         try {
           // Use execSync for maximum compatibility with command line execution
           const result = execSync(command, {
@@ -79,6 +75,7 @@ export class ClaudeCLI {
             shell: process.env.SHELL || '/bin/bash', // Explicitly use shell
             stdio: ['inherit', 'pipe', 'pipe'], // Inherit stdin, pipe stdout/stderr
           });
+
 
           resolve(result);
         } catch (error: any) {
@@ -113,7 +110,15 @@ export class ClaudeCLI {
 
     if (showProgress) {
       const message = `Executing Claude CLI command: ${args.join(' ')}`;
-      return withSpinner(operation, message, 'dots');
+      const result = await withSpinner(operation, message, 'dots');
+      
+      // Output debug info after spinner completes
+      if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
+        logger.debug(`Executing with shell: ${this.cliPath} ${args.join(' ')}`);
+        logger.debug(`Working directory: ${process.cwd()}`);
+      }
+      
+      return result;
     } else {
       return operation();
     }
