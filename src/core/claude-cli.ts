@@ -32,74 +32,79 @@ export class ClaudeCLI {
    * @param timeoutMs - Timeout in milliseconds (default: 60000)
    * @param showProgress - Whether to show progress spinner (default: true for operations >2s)
    */
-  async executeClaudeCommand(args: string[], timeoutMs = 180000, showProgress = timeoutMs >= 2000 && process.env.NODE_ENV !== 'test'): Promise<string> {
+  async executeClaudeCommand(
+    args: string[],
+    timeoutMs = 180000,
+    showProgress = timeoutMs >= 2000 && process.env.NODE_ENV !== 'test'
+  ): Promise<string> {
     // Log proxy settings for debugging (only for check command)
     const isCheckCommand = args.includes('check');
     const proxyVars = {
       http_proxy: process.env.http_proxy,
       https_proxy: process.env.https_proxy,
     };
-    
+
     if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
       console.debug(`[DEBUG] Proxy settings: ${JSON.stringify(proxyVars)}`);
       console.debug(`[DEBUG] Executing: ${this.cliPath} ${args.join(' ')}`);
     }
 
-    const operation = () => new Promise<string>((resolve, reject) => {
-      // Build the command string with proper shell escaping
-      const quotedArgs = args.map(arg => {
-        // Use JSON.stringify for proper shell escaping
-        return JSON.stringify(arg);
-      });
-      
-      const command = `${this.cliPath} ${quotedArgs.join(' ')}`;
-      
-      if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
-        console.debug(`[DEBUG] Executing with shell: ${command}`);
-        console.debug(`[DEBUG] Working directory: ${process.cwd()}`);
-      }
-
-      try {
-        // Use execSync for maximum compatibility with command line execution
-        const result = execSync(command, {
-          encoding: 'utf8',
-          timeout: timeoutMs,
-          env: process.env, // Use complete environment as-is
-          cwd: process.cwd(),
-          shell: process.env.SHELL || '/bin/bash', // Explicitly use shell
-          stdio: ['inherit', 'pipe', 'pipe'], // Inherit stdin, pipe stdout/stderr
+    const operation = () =>
+      new Promise<string>((resolve, reject) => {
+        // Build the command string with proper shell escaping
+        const quotedArgs = args.map((arg) => {
+          // Use JSON.stringify for proper shell escaping
+          return JSON.stringify(arg);
         });
-        
-        resolve(result);
-      } catch (error: any) {
-        if (error.status === null) {
-          // Timeout or signal
-          reject(
-            new ClaudeAutoResumeError(
-              `Claude CLI command timed out after ${timeoutMs}ms`,
-              1,
-              `Command: ${command}`
-            )
-          );
-        } else if (error.code === 'ENOENT') {
-          reject(
-            new ClaudeAutoResumeError(
-              'Claude CLI not found in PATH',
-              1,
-              `Make sure Claude CLI is installed and available in PATH. Command: ${command}`
-            )
-          );
-        } else {
-          reject(
-            new ClaudeAutoResumeError(
-              `Claude CLI execution failed with exit code ${error.status || 'unknown'}`,
-              1,
-              `Command: ${command}\\nStderr: ${error.stderr || ''}\\nError: ${error.message}`
-            )
-          );
+
+        const command = `${this.cliPath} ${quotedArgs.join(' ')}`;
+
+        if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
+          console.debug(`[DEBUG] Executing with shell: ${command}`);
+          console.debug(`[DEBUG] Working directory: ${process.cwd()}`);
         }
-      }
-    });
+
+        try {
+          // Use execSync for maximum compatibility with command line execution
+          const result = execSync(command, {
+            encoding: 'utf8',
+            timeout: timeoutMs,
+            env: process.env, // Use complete environment as-is
+            cwd: process.cwd(),
+            shell: process.env.SHELL || '/bin/bash', // Explicitly use shell
+            stdio: ['inherit', 'pipe', 'pipe'], // Inherit stdin, pipe stdout/stderr
+          });
+
+          resolve(result);
+        } catch (error: any) {
+          if (error.status === null) {
+            // Timeout or signal
+            reject(
+              new ClaudeAutoResumeError(
+                `Claude CLI command timed out after ${timeoutMs}ms`,
+                1,
+                `Command: ${command}`
+              )
+            );
+          } else if (error.code === 'ENOENT') {
+            reject(
+              new ClaudeAutoResumeError(
+                'Claude CLI not found in PATH',
+                1,
+                `Make sure Claude CLI is installed and available in PATH. Command: ${command}`
+              )
+            );
+          } else {
+            reject(
+              new ClaudeAutoResumeError(
+                `Claude CLI execution failed with exit code ${error.status || 'unknown'}`,
+                1,
+                `Command: ${command}\\nStderr: ${error.stderr || ''}\\nError: ${error.message}`
+              )
+            );
+          }
+        }
+      });
 
     if (showProgress) {
       const message = `Executing Claude CLI command: ${args.join(' ')}`;

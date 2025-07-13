@@ -58,7 +58,7 @@ export class Logger {
    */
   private ensureLogDirectory(): void {
     if (!this.logFile) return;
-    
+
     const dir = path.dirname(this.logFile);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -121,12 +121,17 @@ export class Logger {
   /**
    * Writes to both console and file if configured
    */
-  private writeLog(level: string, message: string, context?: object, consoleMethod: (...args: any[]) => void = console.log): void {
+  private writeLog(
+    level: string,
+    message: string,
+    context?: object,
+    consoleMethod: (...args: any[]) => void = console.log
+  ): void {
     const formattedMessage = this.formatMessage(level, message, context);
-    
+
     // Console output
     consoleMethod(`[${level}] ${message}`, context ? context : '');
-    
+
     // File output
     if (this.logStream) {
       this.logStream.write(formattedMessage + os.EOL);

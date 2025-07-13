@@ -49,11 +49,14 @@ describe('ClaudeCLI with execSync', () => {
 
       const result = await claudeCli.executeClaudeCommand(['-p', 'test']);
 
-      expect(mockExecSync).toHaveBeenCalledWith('claude "-p" "test"', expect.objectContaining({
-        encoding: 'utf8',
-        env: process.env,
-        shell: expect.any(String),
-      }));
+      expect(mockExecSync).toHaveBeenCalledWith(
+        'claude "-p" "test"',
+        expect.objectContaining({
+          encoding: 'utf8',
+          env: process.env,
+          shell: expect.any(String),
+        })
+      );
       expect(result).toBe('success output');
     });
 
@@ -108,7 +111,10 @@ describe('ClaudeCLI with execSync', () => {
 
       await claudeCli.executeClaudeCommand(['-p', 'test with spaces']);
 
-      expect(mockExecSync).toHaveBeenCalledWith('claude "-p" "test with spaces"', expect.any(Object));
+      expect(mockExecSync).toHaveBeenCalledWith(
+        'claude "-p" "test with spaces"',
+        expect.any(Object)
+      );
     });
 
     it('should include proper environment and options', async () => {
@@ -116,13 +122,16 @@ describe('ClaudeCLI with execSync', () => {
 
       await claudeCli.executeClaudeCommand(['-p', 'test']);
 
-      expect(mockExecSync).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
-        encoding: 'utf8',
-        env: process.env,
-        cwd: process.cwd(),
-        shell: expect.any(String),
-        stdio: ['inherit', 'pipe', 'pipe'],
-      }));
+      expect(mockExecSync).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          encoding: 'utf8',
+          env: process.env,
+          cwd: process.cwd(),
+          shell: expect.any(String),
+          stdio: ['inherit', 'pipe', 'pipe'],
+        })
+      );
     });
   });
 
@@ -147,7 +156,7 @@ describe('ClaudeCLI with execSync', () => {
 
     it('should handle invalid timestamp', () => {
       const output = 'Claude AI usage limit reached|invalid';
-      
+
       expect(() => claudeCli.parseUsageLimitOutput(output)).toThrow(ClaudeAutoResumeError);
     });
   });
@@ -176,25 +185,25 @@ describe('ClaudeCLI with execSync', () => {
   describe('buildClaudeCommand', () => {
     it('should build command with all flags', () => {
       const args = claudeCli.buildClaudeCommand('test prompt', true, true);
-      
+
       expect(args).toEqual(['-c', '--dangerously-skip-permissions', '-p', 'test prompt']);
     });
 
     it('should build command without continue flag', () => {
       const args = claudeCli.buildClaudeCommand('test prompt', false, true);
-      
+
       expect(args).toEqual(['--dangerously-skip-permissions', '-p', 'test prompt']);
     });
 
     it('should build command without skip permissions', () => {
       const args = claudeCli.buildClaudeCommand('test prompt', true, false);
-      
+
       expect(args).toEqual(['-c', '-p', 'test prompt']);
     });
 
     it('should build minimal command', () => {
       const args = claudeCli.buildClaudeCommand('test prompt', false, false);
-      
+
       expect(args).toEqual(['-p', 'test prompt']);
     });
   });

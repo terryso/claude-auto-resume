@@ -170,7 +170,7 @@ describe('Enhanced Validators', () => {
       const now = Date.now();
       const secondsResult = validateTimestampWithFeedback(now / 1000);
       const millisecondsResult = validateTimestampWithFeedback(now);
-      
+
       expect(secondsResult.valid).toBe(true);
       expect(millisecondsResult.valid).toBe(true);
     });
@@ -218,7 +218,9 @@ describe('Enhanced Validators', () => {
     it('should warn about command substitution', () => {
       const result = validateCommandWithFeedback('echo $(whoami)');
       expect(result.valid).toBe(true);
-      expect(result.warnings).toContain('Command contains command substitution - ensure it\'s from trusted source');
+      expect(result.warnings).toContain(
+        "Command contains command substitution - ensure it's from trusted source"
+      );
     });
 
     it('should warn about sudo commands', () => {
@@ -230,7 +232,9 @@ describe('Enhanced Validators', () => {
     it('should warn about incomplete commands', () => {
       const result = validateCommandWithFeedback('echo hello &&');
       expect(result.valid).toBe(true);
-      expect(result.warnings).toContain('Command ends with shell operators - this might be incomplete');
+      expect(result.warnings).toContain(
+        'Command ends with shell operators - this might be incomplete'
+      );
     });
   });
 
@@ -341,7 +345,7 @@ describe('Enhanced Validators', () => {
     it('should validate compatible option combinations', () => {
       const result = validateArgumentCombinationsWithFeedback({
         prompt: 'test',
-        verbose: true
+        verbose: true,
       });
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -350,28 +354,28 @@ describe('Enhanced Validators', () => {
     it('should detect mutually exclusive options', () => {
       const result1 = validateArgumentCombinationsWithFeedback({
         execute: 'command',
-        continue: true
+        continue: true,
       });
       expect(result1.valid).toBe(false);
       expect(result1.errors).toContain('Cannot use execute mode with continue mode');
 
       const result2 = validateArgumentCombinationsWithFeedback({
         cmd: 'command',
-        continue: true
+        continue: true,
       });
       expect(result2.valid).toBe(false);
       expect(result2.errors).toContain('Cannot use custom command with continue mode');
 
       const result3 = validateArgumentCombinationsWithFeedback({
         execute: 'command1',
-        cmd: 'command2'
+        cmd: 'command2',
       });
       expect(result3.valid).toBe(false);
       expect(result3.errors).toContain('Cannot use both execute and cmd options together');
 
       const result4 = validateArgumentCombinationsWithFeedback({
         version: true,
-        help: true
+        help: true,
       });
       expect(result4.valid).toBe(false);
       expect(result4.errors).toContain('Use either --version or --help, not both');
@@ -379,25 +383,31 @@ describe('Enhanced Validators', () => {
 
     it('should provide suggestions for incomplete combinations', () => {
       const result1 = validateArgumentCombinationsWithFeedback({
-        execute: 'command'
+        execute: 'command',
       });
       expect(result1.valid).toBe(true);
-      expect(result1.suggestions).toContain('Consider providing a prompt with --prompt when using --execute');
+      expect(result1.suggestions).toContain(
+        'Consider providing a prompt with --prompt when using --execute'
+      );
 
       const result2 = validateArgumentCombinationsWithFeedback({
-        cmd: 'command'
+        cmd: 'command',
       });
       expect(result2.valid).toBe(true);
-      expect(result2.suggestions).toContain('Consider providing a prompt with --prompt when using --cmd');
+      expect(result2.suggestions).toContain(
+        'Consider providing a prompt with --prompt when using --cmd'
+      );
     });
 
     it('should warn about test mode with production options', () => {
       const result = validateArgumentCombinationsWithFeedback({
         testMode: 60,
-        execute: 'production-command'
+        execute: 'production-command',
       });
       expect(result.valid).toBe(true);
-      expect(result.suggestions).toContain('Test mode with execute/cmd may not behave as expected - use for testing only');
+      expect(result.suggestions).toContain(
+        'Test mode with execute/cmd may not behave as expected - use for testing only'
+      );
     });
 
     it('should handle empty options object', () => {

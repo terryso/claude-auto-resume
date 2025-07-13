@@ -116,7 +116,7 @@ export class DebugUtils {
   private static performanceMetrics: PerformanceMetrics = {
     startup: { configLoad: 0, validation: 0, total: 0 },
     operations: [],
-    memory: { heapUsed: 0, heapTotal: 0, external: 0, rss: 0 }
+    memory: { heapUsed: 0, heapTotal: 0, external: 0, rss: 0 },
   };
 
   /**
@@ -156,7 +156,7 @@ export class DebugUtils {
    */
   static async collectSystemInfo(): Promise<SystemInfo> {
     const startTime = Date.now();
-    
+
     try {
       // OS Information
       const memInfo = process.memoryUsage();
@@ -169,8 +169,8 @@ export class DebugUtils {
         memory: {
           total: os.totalmem(),
           free: os.freemem(),
-          available: os.freemem() // Simplified - could use more detailed calculation
-        }
+          available: os.freemem(), // Simplified - could use more detailed calculation
+        },
       };
 
       // Node.js Information
@@ -181,7 +181,7 @@ export class DebugUtils {
         execPath: process.execPath,
         pid: process.pid,
         ppid: process.ppid || 0,
-        cwd: process.cwd()
+        cwd: process.cwd(),
       };
 
       // Claude CLI Information
@@ -189,15 +189,14 @@ export class DebugUtils {
 
       // Network Information
       const networkInterfaces = os.networkInterfaces();
-      const interfaces = Object.entries(networkInterfaces)
-        .flatMap(([name, addresses]) => 
-          (addresses || []).map(addr => ({
-            name,
-            address: addr.address,
-            family: addr.family,
-            internal: addr.internal
-          }))
-        );
+      const interfaces = Object.entries(networkInterfaces).flatMap(([name, addresses]) =>
+        (addresses || []).map((addr) => ({
+          name,
+          address: addr.address,
+          family: addr.family,
+          internal: addr.internal,
+        }))
+      );
 
       // Network connectivity (if debug mode is enabled)
       let connectivity;
@@ -211,7 +210,7 @@ export class DebugUtils {
         user: os.userInfo().username,
         shell: process.env.SHELL,
         path: (process.env.PATH || '').split(path.delimiter),
-        claudeVars: DebugUtils.getClaudeEnvironmentVariables()
+        claudeVars: DebugUtils.getClaudeEnvironmentVariables(),
       };
 
       const duration = Date.now() - startTime;
@@ -222,9 +221,8 @@ export class DebugUtils {
         node: nodeInfo,
         claude: claudeInfo,
         network: { interfaces, connectivity },
-        environment: environmentInfo
+        environment: environmentInfo,
       };
-
     } catch (error) {
       logger.error('Failed to collect system information', { error });
       throw error;
@@ -239,7 +237,7 @@ export class DebugUtils {
       const result = await new Promise<string>((resolve, reject) => {
         const child = spawn('claude', ['--version'], {
           stdio: ['ignore', 'pipe', 'pipe'],
-          timeout: 5000
+          timeout: 5000,
         });
 
         let stdout = '';
@@ -269,13 +267,12 @@ export class DebugUtils {
       return {
         cliPath: 'claude',
         version: result,
-        available: true
+        available: true,
       };
-
     } catch (error) {
       return {
         available: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
@@ -289,14 +286,14 @@ export class DebugUtils {
       return {
         ping: status.ping.connected,
         curl: status.curl.connected,
-        wget: status.wget.connected
+        wget: status.wget.connected,
       };
     } catch (error) {
       DebugUtils.log('Network connectivity check failed', { error });
       return {
         ping: false,
         curl: false,
-        wget: false
+        wget: false,
       };
     }
   }
@@ -311,7 +308,7 @@ export class DebugUtils {
       'CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS',
       'CLAUDE_AUTO_RESUME_LOG_FILE',
       'CLAUDE_AUTO_RESUME_LOG_LEVEL',
-      'CLAUDE_CLI_PATH'
+      'CLAUDE_CLI_PATH',
     ];
 
     for (const varName of envVars) {
@@ -339,20 +336,20 @@ export class DebugUtils {
         cliArgs,
         envVars,
         configFile,
-        defaults
+        defaults,
       },
       resolved,
       precedence: ['CLI arguments', 'Environment variables', 'Configuration file', 'Defaults'],
       validation: {
         valid: true,
         errors: [],
-        warnings: []
-      }
+        warnings: [],
+      },
     };
 
-    DebugUtils.log('Configuration debug info collected', { 
+    DebugUtils.log('Configuration debug info collected', {
       sources: Object.keys(debugInfo.sources),
-      resolved: Object.keys(debugInfo.resolved)
+      resolved: Object.keys(debugInfo.resolved),
     });
 
     return debugInfo;
@@ -361,13 +358,18 @@ export class DebugUtils {
   /**
    * Records performance metric for debugging
    */
-  static recordPerformanceMetric(name: string, duration: number, success: boolean, error?: string): void {
+  static recordPerformanceMetric(
+    name: string,
+    duration: number,
+    success: boolean,
+    error?: string
+  ): void {
     const metric = {
       name,
       duration,
       timestamp: Date.now(),
       success,
-      error
+      error,
     };
 
     DebugUtils.performanceMetrics.operations.push(metric);
@@ -375,7 +377,8 @@ export class DebugUtils {
 
     // Keep only last 100 operations to prevent memory issues
     if (DebugUtils.performanceMetrics.operations.length > 100) {
-      DebugUtils.performanceMetrics.operations = DebugUtils.performanceMetrics.operations.slice(-100);
+      DebugUtils.performanceMetrics.operations =
+        DebugUtils.performanceMetrics.operations.slice(-100);
     }
   }
 
@@ -388,7 +391,7 @@ export class DebugUtils {
       heapUsed: memUsage.heapUsed,
       heapTotal: memUsage.heapTotal,
       external: memUsage.external,
-      rss: memUsage.rss
+      rss: memUsage.rss,
     };
 
     DebugUtils.log('Memory metrics updated', DebugUtils.performanceMetrics.memory);
@@ -435,7 +438,9 @@ export class DebugUtils {
       '🌐 NETWORK INFORMATION',
       '-'.repeat(40),
       `Interfaces: ${systemInfo.network.interfaces.length} detected`,
-      systemInfo.network.connectivity ? `Connectivity: Ping ${systemInfo.network.connectivity.ping ? '✅' : '❌'} | Curl ${systemInfo.network.connectivity.curl ? '✅' : '❌'} | Wget ${systemInfo.network.connectivity.wget ? '✅' : '❌'}` : '',
+      systemInfo.network.connectivity
+        ? `Connectivity: Ping ${systemInfo.network.connectivity.ping ? '✅' : '❌'} | Curl ${systemInfo.network.connectivity.curl ? '✅' : '❌'} | Wget ${systemInfo.network.connectivity.wget ? '✅' : '❌'}`
+        : '',
       '',
       '⚙️ CONFIGURATION INFORMATION',
       '-'.repeat(40),
@@ -446,7 +451,9 @@ export class DebugUtils {
       '',
       '🔧 ENVIRONMENT VARIABLES',
       '-'.repeat(40),
-      ...Object.entries(systemInfo.environment.claudeVars).map(([key, value]) => `${key}: ${value}`),
+      ...Object.entries(systemInfo.environment.claudeVars).map(
+        ([key, value]) => `${key}: ${value}`
+      ),
       '',
       '📈 PERFORMANCE METRICS',
       '-'.repeat(40),
@@ -454,8 +461,8 @@ export class DebugUtils {
       `RSS: ${Math.round(DebugUtils.performanceMetrics.memory.rss / 1024 / 1024)}MB`,
       `Operations: ${DebugUtils.performanceMetrics.operations.length} recorded`,
       '',
-      '='.repeat(80)
-    ].filter(line => line !== ''); // Remove empty lines from conditionals
+      '='.repeat(80),
+    ].filter((line) => line !== ''); // Remove empty lines from conditionals
 
     return sections.join('\n');
   }
@@ -476,14 +483,16 @@ export class DebugUtils {
         version: process.env.npm_package_version || 'unknown',
         systemInfo,
         performanceMetrics,
-        debugMode: DebugUtils.isDebugMode
+        debugMode: DebugUtils.isDebugMode,
       };
 
       await fs.promises.writeFile(filename, JSON.stringify(debugExport, null, 2), 'utf-8');
-      DebugUtils.log('Debug information exported', { filename, size: JSON.stringify(debugExport).length });
-      
-      return filename;
+      DebugUtils.log('Debug information exported', {
+        filename,
+        size: JSON.stringify(debugExport).length,
+      });
 
+      return filename;
     } catch (error) {
       logger.error('Failed to export debug information', { error, filename });
       throw error;
@@ -498,15 +507,15 @@ export class DebugUtils {
     operation: () => Promise<T>
   ): Promise<T> {
     const startTime = Date.now();
-    
+
     try {
       DebugUtils.log(`Starting operation: ${operationName}`);
       const result = await operation();
       const duration = Date.now() - startTime;
-      
+
       DebugUtils.recordPerformanceMetric(operationName, duration, true);
       DebugUtils.log(`Completed operation: ${operationName}`, { duration });
-      
+
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;

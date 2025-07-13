@@ -183,13 +183,13 @@ export class TimeUtils {
   } {
     const now = Date.now() / 1000;
     const diff = timestamp - now;
-    
+
     return {
       absolute: TimeUtils.timestampToString(timestamp),
       relative: TimeUtils.formatRelativeTime(timestamp),
       duration: TimeUtils.formatDuration(Math.max(0, diff)),
       timezone: TimeUtils.getTimezoneDisplay(timestamp),
-      formatted: TimeUtils.formatTimeWithContext(timestamp)
+      formatted: TimeUtils.formatTimeWithContext(timestamp),
     };
   }
 
@@ -200,7 +200,7 @@ export class TimeUtils {
     const now = Date.now() / 1000;
     const diff = timestamp - now;
     const date = new Date(timestamp * 1000);
-    
+
     // Get locale-specific time string with timezone
     const timeString = date.toLocaleString(undefined, {
       year: 'numeric',
@@ -209,12 +209,13 @@ export class TimeUtils {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      timeZoneName: 'short'
+      timeZoneName: 'short',
     });
-    
+
     const relative = TimeUtils.formatRelativeTime(timestamp);
-    
-    if (Math.abs(diff) < 86400) { // Less than 24 hours
+
+    if (Math.abs(diff) < 86400) {
+      // Less than 24 hours
       return `${timeString} (${relative})`;
     } else {
       const duration = TimeUtils.formatDuration(Math.abs(diff));
@@ -232,9 +233,9 @@ export class TimeUtils {
     const hours = Math.floor(absOffset / 60);
     const minutes = absOffset % 60;
     const sign = offset <= 0 ? '+' : '-';
-    
+
     const offsetString = `UTC${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-    
+
     // Try to get timezone name
     try {
       const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -249,7 +250,7 @@ export class TimeUtils {
    */
   static formatDynamicDuration(seconds: number): string {
     const absSecs = Math.abs(seconds);
-    
+
     if (absSecs < 60) {
       // Show seconds for short durations
       return TimeUtils.formatDuration(seconds);
@@ -328,19 +329,21 @@ export class TimeUtils {
 
     try {
       const resumeTime = Math.floor(Date.now() / 1000) + seconds;
-      
+
       // Show initial resume time
       logger.info(`Resume time: ${TimeUtils.timestampToString(resumeTime)}`);
       logger.info(`Waiting ${seconds} seconds...`);
-      
+
       // Simple countdown like shell script
       while (remaining > 0 && !interrupted) {
         const hours = Math.floor(remaining / 3600);
         const minutes = Math.floor((remaining % 3600) / 60);
         const secs = remaining % 60;
-        
-        process.stdout.write(`\rResuming in ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}...`);
-        
+
+        process.stdout.write(
+          `\rResuming in ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}...`
+        );
+
         await new Promise((resolve) => setTimeout(resolve, 1000));
         remaining--;
       }
@@ -365,7 +368,7 @@ export class TimeUtils {
       logger.info('Applied wait buffer', {
         bufferSeconds,
         originalDuration: TimeUtils.formatDuration(waitSeconds),
-        totalDuration: TimeUtils.formatDuration(total)
+        totalDuration: TimeUtils.formatDuration(total),
       });
     }
     return total;

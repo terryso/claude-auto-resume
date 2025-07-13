@@ -48,7 +48,7 @@ const CONFIG_FILE_NAMES = [
   '.claude-auto-resume.json',
   'claude-auto-resume.config.json',
   '.clauderc.json',
-  'claude-config.json'
+  'claude-config.json',
 ];
 
 /**
@@ -57,7 +57,7 @@ const CONFIG_FILE_NAMES = [
 export function discoverConfigFile(): string | null {
   const searchPaths = [
     process.cwd(),
-    path.join(process.env.HOME || process.env.USERPROFILE || '/tmp', '.')
+    path.join(process.env.HOME || process.env.USERPROFILE || '/tmp', '.'),
   ];
 
   for (const searchPath of searchPaths) {
@@ -169,7 +169,7 @@ export function validateConfigFile(config: any): ConfigFile {
     if (!config.customCommands || typeof config.customCommands !== 'object') {
       throw new Error('customCommands must be an object');
     }
-    
+
     const commands: Record<string, string> = {};
     for (const [key, value] of Object.entries(config.customCommands)) {
       if (typeof key !== 'string' || typeof value !== 'string') {
@@ -208,7 +208,7 @@ export function validateConfigFile(config: any): ConfigFile {
       if (!Array.isArray(config.network.checkUrls)) {
         throw new Error('network.checkUrls must be an array');
       }
-      
+
       const urls: string[] = [];
       for (const url of config.network.checkUrls) {
         if (typeof url !== 'string' || !url.trim()) {
@@ -237,13 +237,13 @@ export function loadConfigFile(filePath: string): ConfigFile {
     }
 
     const fileContent = fs.readFileSync(filePath, 'utf8');
-    
+
     if (!fileContent.trim()) {
       throw new Error('Configuration file is empty');
     }
 
     let parsedConfig: any;
-    
+
     try {
       parsedConfig = JSON.parse(fileContent);
     } catch (parseError) {
@@ -251,14 +251,13 @@ export function loadConfigFile(filePath: string): ConfigFile {
     }
 
     const validatedConfig = validateConfigFile(parsedConfig);
-    
-    logger.info('Configuration file loaded successfully', { 
-      filePath, 
-      configKeys: Object.keys(validatedConfig) 
-    });
-    
-    return validatedConfig;
 
+    logger.info('Configuration file loaded successfully', {
+      filePath,
+      configKeys: Object.keys(validatedConfig),
+    });
+
+    return validatedConfig;
   } catch (error) {
     logger.error('Failed to load configuration file', { filePath, error });
     throw error;
@@ -279,14 +278,16 @@ export function mergeConfigFile(baseConfig: CLIConfig, fileConfig: ConfigFile): 
     ...(fileConfig.maxRetries && { maxRetries: fileConfig.maxRetries }),
     ...(fileConfig.claudeCliPath && { claudeCliPath: fileConfig.claudeCliPath }),
     ...(fileConfig.waitBuffer !== undefined && { waitBuffer: fileConfig.waitBuffer }),
-    ...(fileConfig.skipPermissions !== undefined && { skipPermissions: fileConfig.skipPermissions }),
+    ...(fileConfig.skipPermissions !== undefined && {
+      skipPermissions: fileConfig.skipPermissions,
+    }),
     ...(fileConfig.logFile && { logFile: fileConfig.logFile }),
   };
 
-  logger.debug('Configuration merge completed', { 
+  logger.debug('Configuration merge completed', {
     originalKeys: Object.keys(baseConfig),
     fileKeys: Object.keys(fileConfig),
-    mergedKeys: Object.keys(merged)
+    mergedKeys: Object.keys(merged),
   });
 
   return merged;
@@ -297,7 +298,7 @@ export function mergeConfigFile(baseConfig: CLIConfig, fileConfig: ConfigFile): 
  */
 export function autoLoadConfigFile(): ConfigFile | null {
   const configPath = discoverConfigFile();
-  
+
   if (!configPath) {
     logger.debug('No configuration file auto-discovered');
     return null;
@@ -306,9 +307,9 @@ export function autoLoadConfigFile(): ConfigFile | null {
   try {
     return loadConfigFile(configPath);
   } catch (error) {
-    logger.warn('Failed to load auto-discovered configuration file', { 
-      configPath, 
-      error: error instanceof Error ? error.message : error 
+    logger.warn('Failed to load auto-discovered configuration file', {
+      configPath,
+      error: error instanceof Error ? error.message : error,
     });
     return null;
   }

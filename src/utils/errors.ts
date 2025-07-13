@@ -13,7 +13,7 @@ export enum ErrorCategory {
   FILE_SYSTEM = 'FILE_SYSTEM',
   VALIDATION = 'VALIDATION',
   TIMEOUT = 'TIMEOUT',
-  PERMISSION = 'PERMISSION'
+  PERMISSION = 'PERMISSION',
 }
 
 /**
@@ -282,7 +282,7 @@ export const EnhancedErrors = {
       'Increase timeout value or check for blocking issues',
       'Set timeout environment variables or use --debug for diagnostics',
       ErrorCategory.TIMEOUT
-    )
+    ),
 };
 
 // Legacy error functions for backward compatibility

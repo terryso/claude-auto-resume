@@ -99,7 +99,7 @@ function parseLogFile(value: string | undefined): string | undefined {
  * 1. Environment variables (highest priority)
  * 2. Configuration file
  * 3. Default values (lowest priority)
- * 
+ *
  * @param exitOnError - Whether to exit process on error (default: true)
  */
 export function loadConfiguration(exitOnError = true): CLIConfig {
@@ -140,8 +140,8 @@ export function loadConfiguration(exitOnError = true): CLIConfig {
         defaultPrompt: envConfig.defaultPrompt,
         waitBuffer: envConfig.waitBuffer,
         skipPermissions: envConfig.skipPermissions,
-        logFile: envConfig.logFile ? 'set' : 'not set'
-      }
+        logFile: envConfig.logFile ? 'set' : 'not set',
+      },
     });
 
     return envConfig;

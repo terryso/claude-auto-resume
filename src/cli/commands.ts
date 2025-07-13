@@ -8,13 +8,13 @@ import { join } from 'path';
 import { CLIOptions } from './types';
 import { loadConfiguration } from '../config';
 import { ClaudeCLI, CommandExecutor, TimeUtils } from '../core';
-import { 
-  logger, 
-  LogLevel, 
-  validatePrompt, 
-  validatePromptWithFeedback, 
-  validateTimeoutWithFeedback, 
-  validateCommandWithFeedback 
+import {
+  logger,
+  LogLevel,
+  validatePrompt,
+  validatePromptWithFeedback,
+  validateTimeoutWithFeedback,
+  validateCommandWithFeedback,
 } from '../utils';
 import { DebugUtils } from '../utils/debug';
 import { NetworkUtils } from '../core/network';
@@ -25,12 +25,45 @@ import type { CLIConfig } from '../config/types';
  */
 function getVersion(): string {
   try {
-    const packagePath = join(__dirname, '..', '..', 'package.json');
-    const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
-    return packageJson.version;
+    // Try multiple possible paths for package.json
+    const possiblePaths = [
+      join(__dirname, '..', '..', 'package.json'),
+      join(process.cwd(), 'package.json'),
+      join(__dirname, 'package.json'),
+      join(__dirname, '..', 'package.json'),
+    ];
+
+    for (const packagePath of possiblePaths) {
+      try {
+        const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
+        if (packageJson.version) {
+          return packageJson.version;
+        }
+      } catch {
+        // Try next path
+        continue;
+      }
+    }
+
+    throw new Error('No package.json found in any expected location');
   } catch (error) {
-    console.error('Failed to read version from package.json');
-    return 'unknown';
+    // Fallback to reading from npm environment if available
+    try {
+      const { execSync } = require('child_process');
+      const npmVersion = execSync('npm list claude-auto-resume --depth=0 --json 2>/dev/null', {
+        encoding: 'utf8',
+        cwd: process.cwd(),
+      });
+      const npmData = JSON.parse(npmVersion);
+      const version = npmData?.dependencies?.['claude-auto-resume']?.version;
+      if (version) {
+        return version;
+      }
+    } catch {
+      // Ignore npm lookup errors
+    }
+
+    return '2.0.1'; // Fallback version
   }
 }
 
@@ -103,7 +136,7 @@ Examples:
             process.exit(1);
           }
           if (commandValidation.warnings) {
-            commandValidation.warnings.forEach(warning => {
+            commandValidation.warnings.forEach((warning) => {
               logger.warn(`Command warning: ${warning}`);
             });
           }
@@ -175,7 +208,7 @@ Examples:
             hasLimit: true,
             resumeTimestamp: currentTime + options.testMode,
             rawOutput: `Claude AI usage limit reached|${currentTime + options.testMode}`,
-            waitSeconds: options.testMode
+            waitSeconds: options.testMode,
           };
           logger.info(`[DEV] Simulating usage limit with ${options.testMode}s wait time`);
         } else {
@@ -184,11 +217,14 @@ Examples:
 
         if (limitStatus.hasLimit && limitStatus.resumeTimestamp) {
           logger.info('Usage limit detected, waiting...');
-          
+
           // Calculate wait time with buffer
           const currentTime = Math.floor(Date.now() / 1000);
-          const waitSeconds = Math.max(0, limitStatus.resumeTimestamp - currentTime + config.waitBuffer);
-          
+          const waitSeconds = Math.max(
+            0,
+            limitStatus.resumeTimestamp - currentTime + config.waitBuffer
+          );
+
           if (waitSeconds > 0) {
             // Countdown with progress indication
             await TimeUtils.waitWithCountdown(waitSeconds);
@@ -200,7 +236,11 @@ Examples:
           logger.info('Executing custom command after usage limit wait period');
           await CommandExecutor.executeWithSafeguards(options.execute);
         } else {
-          const output = await claudeCli.resume(finalPrompt, options.continue || false, config.skipPermissions);
+          const output = await claudeCli.resume(
+            finalPrompt,
+            options.continue || false,
+            config.skipPermissions
+          );
           // Display Claude output like shell script
           if (output && output.trim()) {
             console.log('CLAUDE_OUTPUT:');
@@ -240,7 +280,7 @@ function configureLogging(options: CLIOptions): void {
   if (options.debug) {
     logger.debug('Logging configuration applied', {
       level: options.debug ? 'DEBUG' : options.verbose ? 'INFO' : options.quiet ? 'ERROR' : 'INFO',
-      fileOutput: logFile || 'disabled'
+      fileOutput: logFile || 'disabled',
     });
   }
 }
@@ -264,7 +304,7 @@ async function showSystemCheck(): Promise<void> {
     const { execSync } = require('child_process');
     const claudeVersion = execSync('claude --version', { encoding: 'utf8', timeout: 5000 }).trim();
     const currentTime = TimeUtils.getTimeDisplay(TimeUtils.getCurrentTimestamp());
-    
+
     logger.info(`Claude CLI Version: ${claudeVersion}`);
     logger.info(`System Time: ${currentTime.absolute} (${currentTime.relative})`);
 
@@ -304,7 +344,11 @@ async function showSystemCheck(): Promise<void> {
 /**
  * Shows comprehensive debug diagnostics using enhanced DebugUtils
  */
-async function showDebugDiagnostics(options: CLIOptions, config: CLIConfig, prompt: string): Promise<void> {
+async function showDebugDiagnostics(
+  options: CLIOptions,
+  config: CLIConfig,
+  prompt: string
+): Promise<void> {
   try {
     // Enable debug mode in DebugUtils
     DebugUtils.enableDebugMode();
@@ -331,13 +375,13 @@ async function showDebugDiagnostics(options: CLIOptions, config: CLIConfig, prom
     logger.debug('=== PROMPT ANALYSIS ===');
     const promptValidation = validatePromptWithFeedback(prompt);
     logger.debug('Prompt Validation:', promptValidation);
-    
+
     logger.debug('Prompt Details:', {
       length: prompt.length,
       trimmedLength: prompt.trim().length,
       hasSpecialChars: /[<>"|&;`$(){}[\]\\]/.test(prompt),
       wordCount: prompt.trim().split(/\s+/).length,
-      lines: prompt.split('\n').length
+      lines: prompt.split('\n').length,
     });
 
     // Performance metrics
@@ -351,16 +395,17 @@ async function showDebugDiagnostics(options: CLIOptions, config: CLIConfig, prom
       available: systemInfo.claude.available,
       version: systemInfo.claude.version,
       path: config.claudeCliPath,
-      error: systemInfo.claude.error
+      error: systemInfo.claude.error,
     });
 
     // Offer to export debug information
     logger.debug('=== DEBUG EXPORT ===');
     logger.info('Debug information collected successfully');
     logger.info('To export full debug info to file, use: claude-auto-resume --debug --export');
-
   } catch (error) {
-    logger.error('Debug diagnostics failed:', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Debug diagnostics failed:', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }

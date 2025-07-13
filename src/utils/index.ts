@@ -21,7 +21,7 @@ export {
   createProgressBar,
   withSpinner,
   withProgress,
-  type ProgressIndicator
+  type ProgressIndicator,
 } from './progress';
 export {
   validatePrompt,

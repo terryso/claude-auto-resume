@@ -1,6 +1,6 @@
 {
   "name": "claude-auto-resume",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Automatically resumes Claude CLI tasks when usage limits are lifted. Supports both npm install and npx usage. TypeScript-based with comprehensive tooling.",
   "main": "dist/index.js",
   "bin": {
@@ -22,7 +22,12 @@
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm run test && npm run lint",
+    "prepublishOnly": "npm run build:prod && npm run test",
+    "version": "npm run build:prod",
+    "postversion": "git push && git push --tags",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "release:major": "npm version major",
     "start": "node dist/index.js"
   },
   "repository": {
@@ -30,7 +35,7 @@
     "url": "git+https://github.com/terryso/claude-auto-resume.git"
   },
   "keywords": ["claude", "ai", "cli", "automation", "resume", "typescript"],
-  "author": "",
+  "author": "Nick <nick@example.com>",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/terryso/claude-auto-resume/issues"
@@ -59,7 +64,7 @@
     "node": ">=18.0.0"
   },
   "files": [
-    "dist/**/*",
+    "/dist",
     "README.md",
     "LICENSE",
     "CLAUDE.md"

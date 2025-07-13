@@ -298,7 +298,7 @@ export class NetworkUtils {
           logger.info('Network connectivity restored', {
             method: result.method,
             responseTime: result.responseTime,
-            attempt
+            attempt,
           });
           return true;
         }
@@ -307,9 +307,9 @@ export class NetworkUtils {
         logger.debug('Network connectivity attempt failed', {
           attempt,
           error: result.error,
-          elapsed: Date.now() - startTime
+          elapsed: Date.now() - startTime,
         });
-        
+
         attempt++;
 
         // Wait before next attempt with spinner update
@@ -324,10 +324,9 @@ export class NetworkUtils {
       logger.error('Network connectivity timeout', {
         maxWaitTime,
         attempts: attempt - 1,
-        elapsed: Date.now() - startTime
+        elapsed: Date.now() - startTime,
       });
       return false;
-
     } catch (error) {
       spinner.fail('Network connectivity check failed');
       logger.error('Network connectivity check error', { error });

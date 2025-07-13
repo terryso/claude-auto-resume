@@ -3,12 +3,12 @@
  */
 
 export { loadConfiguration } from './loader';
-export { 
+export {
   discoverConfigFile,
   loadConfigFile,
   validateConfigFile,
   mergeConfigFile,
   autoLoadConfigFile,
-  type ConfigFile 
+  type ConfigFile,
 } from './file-loader';
 export type { CLIConfig } from './types';

@@ -44,8 +44,8 @@ jobs:
       
     - name: Test CLI functionality
       run: |
-        ./dist/cli.js --help
-        ./dist/cli.js "test prompt"
+        node dist/cli.js --help
+        node dist/cli.js --test-mode 5 -e "echo 'test'"
         
     - name: Upload coverage reports
       if: matrix.node-version == '20.x'

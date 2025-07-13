@@ -49,7 +49,7 @@ describe('Main Function Integration', () => {
 
     // Store original argv
     originalArgv = process.argv;
-    
+
     // Mock logger methods
     jest.spyOn(mainModule.logger, 'error').mockImplementation(() => {});
   });
@@ -69,7 +69,7 @@ describe('Main Function Integration', () => {
     // Mock setupCLI to throw an Error
     const setupCLIMock = require('../cli/commands');
     jest.doMock('../cli/commands', () => ({
-      setupCLI: jest.fn().mockRejectedValue(new Error('Test error'))
+      setupCLI: jest.fn().mockRejectedValue(new Error('Test error')),
     }));
 
     // Re-import to get mocked version
@@ -88,7 +88,7 @@ describe('Main Function Integration', () => {
   it('should handle non-Error objects in main catch block', async () => {
     // Mock setupCLI to throw a non-Error
     jest.doMock('../cli/commands', () => ({
-      setupCLI: jest.fn().mockRejectedValue('String error')
+      setupCLI: jest.fn().mockRejectedValue('String error'),
     }));
 
     // Re-import to get mocked version
@@ -108,7 +108,7 @@ describe('Main Function Integration', () => {
     // Test basic module structure - require.main is read-only in newer Node versions
     expect(require.main).toBeDefined();
     expect(module).toBeDefined();
-    
+
     // We can test the logic without actually modifying require.main
     const isMainModule = require.main === module;
     expect(typeof isMainModule).toBe('boolean');

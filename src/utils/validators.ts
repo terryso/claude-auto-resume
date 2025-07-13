@@ -22,12 +22,16 @@ export function validatePrompt(prompt: string): boolean {
 /**
  * Enhanced prompt validation with detailed error messages
  */
-export function validatePromptWithFeedback(prompt: string): { valid: boolean; error?: string; suggestion?: string } {
+export function validatePromptWithFeedback(prompt: string): {
+  valid: boolean;
+  error?: string;
+  suggestion?: string;
+} {
   if (prompt === null || prompt === undefined) {
     return {
       valid: false,
       error: 'Prompt cannot be null or undefined',
-      suggestion: 'Provide a prompt string like "continue" or "help me with..."'
+      suggestion: 'Provide a prompt string like "continue" or "help me with..."',
     };
   }
 
@@ -35,7 +39,7 @@ export function validatePromptWithFeedback(prompt: string): { valid: boolean; er
     return {
       valid: false,
       error: `Prompt must be a string, got ${typeof prompt}`,
-      suggestion: 'Wrap your prompt in quotes, e.g., "continue with the task"'
+      suggestion: 'Wrap your prompt in quotes, e.g., "continue with the task"',
     };
   }
 
@@ -44,7 +48,7 @@ export function validatePromptWithFeedback(prompt: string): { valid: boolean; er
     return {
       valid: false,
       error: 'Prompt cannot be empty or only whitespace',
-      suggestion: 'Use a meaningful prompt like "continue", "help", or describe what you need'
+      suggestion: 'Use a meaningful prompt like "continue", "help", or describe what you need',
     };
   }
 
@@ -52,7 +56,7 @@ export function validatePromptWithFeedback(prompt: string): { valid: boolean; er
     return {
       valid: false,
       error: 'Prompt is too long (maximum 1000 characters)',
-      suggestion: 'Shorten your prompt to be more concise and focused'
+      suggestion: 'Shorten your prompt to be more concise and focused',
     };
   }
 
@@ -61,7 +65,8 @@ export function validatePromptWithFeedback(prompt: string): { valid: boolean; er
   if (problematicChars.test(prompt)) {
     return {
       valid: true, // Still valid but with warning
-      suggestion: 'Your prompt contains special characters that may need escaping in shell commands'
+      suggestion:
+        'Your prompt contains special characters that may need escaping in shell commands',
     };
   }
 
@@ -78,12 +83,16 @@ export function validateTimeout(timeout: number): boolean {
 /**
  * Enhanced timeout validation with detailed feedback
  */
-export function validateTimeoutWithFeedback(timeout: unknown): { valid: boolean; error?: string; suggestion?: string } {
+export function validateTimeoutWithFeedback(timeout: unknown): {
+  valid: boolean;
+  error?: string;
+  suggestion?: string;
+} {
   if (timeout === null || timeout === undefined) {
     return {
       valid: false,
       error: 'Timeout cannot be null or undefined',
-      suggestion: 'Provide a timeout value in seconds, e.g., 60 for 1 minute'
+      suggestion: 'Provide a timeout value in seconds, e.g., 60 for 1 minute',
     };
   }
 
@@ -91,7 +100,7 @@ export function validateTimeoutWithFeedback(timeout: unknown): { valid: boolean;
     return {
       valid: false,
       error: `Timeout must be a number, got ${typeof timeout}`,
-      suggestion: 'Use a numeric value in seconds, e.g., 30, 60, 120'
+      suggestion: 'Use a numeric value in seconds, e.g., 30, 60, 120',
     };
   }
 
@@ -99,7 +108,7 @@ export function validateTimeoutWithFeedback(timeout: unknown): { valid: boolean;
     return {
       valid: false,
       error: 'Timeout must be a finite number',
-      suggestion: 'Avoid Infinity, -Infinity, or NaN values'
+      suggestion: 'Avoid Infinity, -Infinity, or NaN values',
     };
   }
 
@@ -107,7 +116,7 @@ export function validateTimeoutWithFeedback(timeout: unknown): { valid: boolean;
     return {
       valid: false,
       error: 'Timeout must be positive',
-      suggestion: 'Use a positive number of seconds, e.g., 30 for 30 seconds'
+      suggestion: 'Use a positive number of seconds, e.g., 30 for 30 seconds',
     };
   }
 
@@ -115,22 +124,23 @@ export function validateTimeoutWithFeedback(timeout: unknown): { valid: boolean;
     return {
       valid: false,
       error: 'Timeout too small (minimum 1 second)',
-      suggestion: 'Use at least 1 second for timeout'
+      suggestion: 'Use at least 1 second for timeout',
     };
   }
 
-  if (timeout > 86400) { // 24 hours
+  if (timeout > 86400) {
+    // 24 hours
     return {
       valid: false,
       error: 'Timeout too large (maximum 24 hours)',
-      suggestion: 'Use a timeout of 86400 seconds (24 hours) or less'
+      suggestion: 'Use a timeout of 86400 seconds (24 hours) or less',
     };
   }
 
   if (!Number.isInteger(timeout)) {
     return {
       valid: true, // Valid but with suggestion
-      suggestion: 'Consider using whole seconds for easier readability'
+      suggestion: 'Consider using whole seconds for easier readability',
     };
   }
 
@@ -152,12 +162,16 @@ export function validateTimestamp(timestamp: string): boolean {
 /**
  * Enhanced timestamp validation with detailed feedback
  */
-export function validateTimestampWithFeedback(timestamp: unknown): { valid: boolean; error?: string; suggestion?: string } {
+export function validateTimestampWithFeedback(timestamp: unknown): {
+  valid: boolean;
+  error?: string;
+  suggestion?: string;
+} {
   if (timestamp === null || timestamp === undefined) {
     return {
       valid: false,
       error: 'Timestamp cannot be null or undefined',
-      suggestion: 'Provide a timestamp as ISO string or Unix timestamp'
+      suggestion: 'Provide a timestamp as ISO string or Unix timestamp',
     };
   }
 
@@ -165,7 +179,7 @@ export function validateTimestampWithFeedback(timestamp: unknown): { valid: bool
     return {
       valid: false,
       error: `Timestamp must be a string or number, got ${typeof timestamp}`,
-      suggestion: 'Use ISO date string like "2023-12-25T10:30:00Z" or Unix timestamp'
+      suggestion: 'Use ISO date string like "2023-12-25T10:30:00Z" or Unix timestamp',
     };
   }
 
@@ -175,7 +189,7 @@ export function validateTimestampWithFeedback(timestamp: unknown): { valid: bool
       return {
         valid: false,
         error: 'Timestamp string cannot be empty',
-        suggestion: 'Use format like "2023-12-25T10:30:00Z" or Unix timestamp'
+        suggestion: 'Use format like "2023-12-25T10:30:00Z" or Unix timestamp',
       };
     }
     date = new Date(timestamp);
@@ -185,7 +199,7 @@ export function validateTimestampWithFeedback(timestamp: unknown): { valid: bool
       return {
         valid: false,
         error: 'Timestamp number must be finite',
-        suggestion: 'Use a valid Unix timestamp in seconds or milliseconds'
+        suggestion: 'Use a valid Unix timestamp in seconds or milliseconds',
       };
     }
     date = new Date(timestamp > 1e12 ? timestamp : timestamp * 1000); // Handle both seconds and milliseconds
@@ -195,7 +209,7 @@ export function validateTimestampWithFeedback(timestamp: unknown): { valid: bool
     return {
       valid: false,
       error: 'Invalid timestamp format',
-      suggestion: 'Use ISO format "2023-12-25T10:30:00Z" or Unix timestamp'
+      suggestion: 'Use ISO format "2023-12-25T10:30:00Z" or Unix timestamp',
     };
   }
 
@@ -208,7 +222,7 @@ export function validateTimestampWithFeedback(timestamp: unknown): { valid: bool
     return {
       valid: false,
       error: 'Timestamp is too far in the past (before 1970)',
-      suggestion: 'Use a timestamp after January 1, 1970'
+      suggestion: 'Use a timestamp after January 1, 1970',
     };
   }
 
@@ -216,7 +230,7 @@ export function validateTimestampWithFeedback(timestamp: unknown): { valid: bool
     return {
       valid: false,
       error: 'Timestamp is too far in the future (after 2100)',
-      suggestion: 'Use a reasonable timestamp within the next century'
+      suggestion: 'Use a reasonable timestamp within the next century',
     };
   }
 
@@ -226,12 +240,17 @@ export function validateTimestampWithFeedback(timestamp: unknown): { valid: bool
 /**
  * Validates shell command strings for security and safety
  */
-export function validateCommandWithFeedback(command: unknown): { valid: boolean; error?: string; suggestion?: string; warnings?: string[] } {
+export function validateCommandWithFeedback(command: unknown): {
+  valid: boolean;
+  error?: string;
+  suggestion?: string;
+  warnings?: string[];
+} {
   if (command === null || command === undefined) {
     return {
       valid: false,
       error: 'Command cannot be null or undefined',
-      suggestion: 'Provide a shell command string'
+      suggestion: 'Provide a shell command string',
     };
   }
 
@@ -239,7 +258,7 @@ export function validateCommandWithFeedback(command: unknown): { valid: boolean;
     return {
       valid: false,
       error: `Command must be a string, got ${typeof command}`,
-      suggestion: 'Wrap your command in quotes'
+      suggestion: 'Wrap your command in quotes',
     };
   }
 
@@ -248,7 +267,7 @@ export function validateCommandWithFeedback(command: unknown): { valid: boolean;
     return {
       valid: false,
       error: 'Command cannot be empty',
-      suggestion: 'Provide a valid shell command'
+      suggestion: 'Provide a valid shell command',
     };
   }
 
@@ -256,7 +275,7 @@ export function validateCommandWithFeedback(command: unknown): { valid: boolean;
     return {
       valid: false,
       error: 'Command is too long (maximum 1000 characters)',
-      suggestion: 'Break down your command or use a script file'
+      suggestion: 'Break down your command or use a script file',
     };
   }
 
@@ -270,7 +289,7 @@ export function validateCommandWithFeedback(command: unknown): { valid: boolean;
     /\bformat\b/i,
     /\bfdisk\b/i,
     /\bshred\b/i,
-    /\bwipe\b/i
+    /\bwipe\b/i,
   ];
 
   for (const pattern of dangerousCommands) {
@@ -282,7 +301,7 @@ export function validateCommandWithFeedback(command: unknown): { valid: boolean;
 
   // Check for suspicious patterns
   if (/\$\([^)]*\)|`[^`]*`|\$\{[^}]*\}/.test(trimmed)) {
-    warnings.push('Command contains command substitution - ensure it\'s from trusted source');
+    warnings.push("Command contains command substitution - ensure it's from trusted source");
   }
 
   if (/[;&|]\s*$/.test(trimmed)) {
@@ -295,7 +314,7 @@ export function validateCommandWithFeedback(command: unknown): { valid: boolean;
 
   return {
     valid: true,
-    warnings: warnings.length > 0 ? warnings : undefined
+    warnings: warnings.length > 0 ? warnings : undefined,
   };
 }
 
@@ -511,12 +530,15 @@ export function validateWritableDirectory(dirPath: string): boolean {
 /**
  * Enhanced file path validation with detailed feedback
  */
-export function validateFilePathWithFeedback(filePath: unknown, mode: 'read' | 'write' | 'execute'): { valid: boolean; error?: string; suggestion?: string } {
+export function validateFilePathWithFeedback(
+  filePath: unknown,
+  mode: 'read' | 'write' | 'execute'
+): { valid: boolean; error?: string; suggestion?: string } {
   if (filePath === null || filePath === undefined) {
     return {
       valid: false,
       error: 'File path cannot be null or undefined',
-      suggestion: 'Provide a valid file path'
+      suggestion: 'Provide a valid file path',
     };
   }
 
@@ -524,7 +546,7 @@ export function validateFilePathWithFeedback(filePath: unknown, mode: 'read' | '
     return {
       valid: false,
       error: `File path must be a string, got ${typeof filePath}`,
-      suggestion: 'Use a string path like "/path/to/file" or "./relative/path"'
+      suggestion: 'Use a string path like "/path/to/file" or "./relative/path"',
     };
   }
 
@@ -533,7 +555,7 @@ export function validateFilePathWithFeedback(filePath: unknown, mode: 'read' | '
     return {
       valid: false,
       error: 'File path cannot be empty',
-      suggestion: 'Provide a valid file path'
+      suggestion: 'Provide a valid file path',
     };
   }
 
@@ -542,16 +564,17 @@ export function validateFilePathWithFeedback(filePath: unknown, mode: 'read' | '
     return {
       valid: false,
       error: 'Path traversal detected',
-      suggestion: 'Use absolute paths or safe relative paths without ".."'
+      suggestion: 'Use absolute paths or safe relative paths without ".."',
     };
   }
 
   // Check if path looks reasonable
-  if (trimmed.length > 260) { // Windows MAX_PATH limit
+  if (trimmed.length > 260) {
+    // Windows MAX_PATH limit
     return {
       valid: false,
       error: 'File path is too long (maximum 260 characters)',
-      suggestion: 'Use a shorter path or move files to a location with shorter path'
+      suggestion: 'Use a shorter path or move files to a location with shorter path',
     };
   }
 
@@ -569,11 +592,12 @@ export function validateFilePathWithFeedback(filePath: unknown, mode: 'read' | '
     return {
       valid: false,
       error: `File path validation failed: ${error}`,
-      suggestion: mode === 'read' 
-        ? 'Ensure the file exists and is readable'
-        : mode === 'write'
-          ? 'Ensure the directory exists and is writable'
-          : 'Ensure the file exists and is executable'
+      suggestion:
+        mode === 'read'
+          ? 'Ensure the file exists and is readable'
+          : mode === 'write'
+            ? 'Ensure the directory exists and is writable'
+            : 'Ensure the file exists and is executable',
     };
   }
 }
@@ -581,7 +605,11 @@ export function validateFilePathWithFeedback(filePath: unknown, mode: 'read' | '
 /**
  * Enhanced environment variable validation with range checking
  */
-export function validateEnvironmentVariableWithFeedback(varName: string, value: unknown, expectedType: 'string' | 'number' | 'boolean'): { valid: boolean; error?: string; suggestion?: string } {
+export function validateEnvironmentVariableWithFeedback(
+  varName: string,
+  value: unknown,
+  expectedType: 'string' | 'number' | 'boolean'
+): { valid: boolean; error?: string; suggestion?: string } {
   if (value === undefined) {
     return { valid: true }; // Environment variables are optional
   }
@@ -590,19 +618,19 @@ export function validateEnvironmentVariableWithFeedback(varName: string, value: 
     return {
       valid: false,
       error: `Environment variable ${varName} must be a string`,
-      suggestion: 'Environment variables are always strings - convert if needed'
+      suggestion: 'Environment variables are always strings - convert if needed',
     };
   }
 
   const trimmed = value.trim();
-  
+
   switch (expectedType) {
     case 'string':
       if (trimmed.length === 0) {
         return {
           valid: false,
           error: `Environment variable ${varName} cannot be empty`,
-          suggestion: 'Provide a non-empty value or unset the variable'
+          suggestion: 'Provide a non-empty value or unset the variable',
         };
       }
       break;
@@ -613,14 +641,14 @@ export function validateEnvironmentVariableWithFeedback(varName: string, value: 
         return {
           valid: false,
           error: `Environment variable ${varName} must be a valid number`,
-          suggestion: 'Use numeric values like "30", "60", "120"'
+          suggestion: 'Use numeric values like "30", "60", "120"',
         };
       }
       if (!Number.isFinite(num)) {
         return {
           valid: false,
           error: `Environment variable ${varName} must be finite`,
-          suggestion: 'Avoid Infinity or -Infinity values'
+          suggestion: 'Avoid Infinity or -Infinity values',
         };
       }
       break;
@@ -631,7 +659,7 @@ export function validateEnvironmentVariableWithFeedback(varName: string, value: 
         return {
           valid: false,
           error: `Environment variable ${varName} must be a boolean value`,
-          suggestion: 'Use "true", "false", "1", "0", "yes", or "no"'
+          suggestion: 'Use "true", "false", "1", "0", "yes", or "no"',
         };
       }
       break;
@@ -643,7 +671,11 @@ export function validateEnvironmentVariableWithFeedback(varName: string, value: 
 /**
  * Validates command-line argument combinations and provides feedback
  */
-export function validateArgumentCombinationsWithFeedback(options: CLIOptions): { valid: boolean; errors: string[]; suggestions: string[] } {
+export function validateArgumentCombinationsWithFeedback(options: CLIOptions): {
+  valid: boolean;
+  errors: string[];
+  suggestions: string[];
+} {
   const errors: string[] = [];
   const suggestions: string[] = [];
 
@@ -673,13 +705,15 @@ export function validateArgumentCombinationsWithFeedback(options: CLIOptions): {
 
   // Check for potentially confusing combinations
   if (options.testMode && (options.execute || options.cmd)) {
-    suggestions.push('Test mode with execute/cmd may not behave as expected - use for testing only');
+    suggestions.push(
+      'Test mode with execute/cmd may not behave as expected - use for testing only'
+    );
   }
 
   return {
     valid: errors.length === 0,
     errors,
-    suggestions
+    suggestions,
   };
 }
 

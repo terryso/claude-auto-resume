@@ -9,20 +9,20 @@ import {
   createSpinner,
   createProgressBar,
   withSpinner,
-  withProgress
+  withProgress,
 } from '../utils/progress';
 
 // Mock process.stdout to prevent actual console output during tests
 const mockStdout = {
   write: jest.fn(),
   clearLine: jest.fn(),
-  cursorTo: jest.fn()
+  cursorTo: jest.fn(),
 };
 
 // Mock process methods
 const mockProcess = {
   on: jest.fn(),
-  removeListener: jest.fn()
+  removeListener: jest.fn(),
 };
 
 describe('Progress Indicators', () => {
@@ -99,7 +99,7 @@ describe('Progress Indicators', () => {
 
       // Get initial call count
       const initialCalls = mockStdout.write.mock.calls.length;
-      
+
       // Fast-forward timer to trigger frame updates
       jest.advanceTimersByTime(240); // 3 frames at 80ms each
 
@@ -157,7 +157,7 @@ describe('Progress Indicators', () => {
     it('should format time correctly', () => {
       const progressBar = new ProgressBar(100);
       progressBar.start('Processing...');
-      
+
       // Fast-forward time to test time formatting
       jest.advanceTimersByTime(65000); // 1 minute 5 seconds
       progressBar.updateProgress(50);
@@ -224,9 +224,9 @@ describe('Progress Indicators', () => {
     describe('withSpinner', () => {
       it('should wrap successful operation with spinner', async () => {
         const operation = jest.fn().mockResolvedValue('success');
-        
+
         const result = await withSpinner(operation, 'Testing...');
-        
+
         expect(result).toBe('success');
         expect(operation).toHaveBeenCalled();
         expect(mockStdout.write).toHaveBeenCalledWith(expect.stringContaining('Testing...'));
@@ -236,9 +236,9 @@ describe('Progress Indicators', () => {
       it('should handle failed operation with spinner', async () => {
         const error = new Error('Test error');
         const operation = jest.fn().mockRejectedValue(error);
-        
+
         await expect(withSpinner(operation, 'Testing...')).rejects.toThrow('Test error');
-        
+
         expect(operation).toHaveBeenCalled();
         expect(mockStdout.write).toHaveBeenCalledWith(expect.stringContaining('Testing...'));
         expect(mockStdout.write).toHaveBeenCalledWith('❌ Testing... - Failed\n');
@@ -246,9 +246,9 @@ describe('Progress Indicators', () => {
 
       it('should accept custom spinner style', async () => {
         const operation = jest.fn().mockResolvedValue('success');
-        
+
         await withSpinner(operation, 'Testing...', 'line');
-        
+
         expect(mockStdout.write).toHaveBeenCalledWith(expect.stringContaining('Testing...'));
       });
     });
@@ -261,9 +261,9 @@ describe('Progress Indicators', () => {
           updateProgress(100);
           return 'success';
         });
-        
+
         const result = await withProgress(operation, 'Processing...', 100);
-        
+
         expect(result).toBe('success');
         expect(operation).toHaveBeenCalled();
         expect(mockStdout.write).toHaveBeenCalledWith(expect.stringContaining('Processing...'));
@@ -278,9 +278,9 @@ describe('Progress Indicators', () => {
           updateProgress(50);
           throw error;
         });
-        
+
         await expect(withProgress(operation, 'Processing...', 100)).rejects.toThrow('Test error');
-        
+
         expect(operation).toHaveBeenCalled();
         expect(mockStdout.write).toHaveBeenCalledWith(expect.stringContaining('Processing...'));
         expect(mockStdout.write).toHaveBeenCalledWith('\n❌ Processing... - Failed\n');

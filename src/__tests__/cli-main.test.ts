@@ -76,7 +76,7 @@ describe('CLI Main', () => {
   it('should handle parse errors', async () => {
     const { program } = require('commander');
     const error = new Error('Parse failed');
-    
+
     // Mock parseAsync to reject with error
     program.parseAsync.mockRejectedValue(error);
 

@@ -1,9 +1,9 @@
-name: Release
+name: Release to NPM
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'
 
 jobs:
   release:
@@ -26,11 +26,11 @@ jobs:
     - name: Run tests
       run: npm test
       
-    - name: Build package
-      run: npm run build
+    - name: Build production
+      run: npm run build:prod
       
     - name: Publish to npm
-      run: npm publish
+      run: npm publish --access public
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         
@@ -42,7 +42,21 @@ jobs:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
         body: |
-          Changes in this Release
+          🚀 New release of claude-auto-resume
+          
+          ## Changes in this release
           - See [CHANGELOG.md](CHANGELOG.md) for details
+          
+          ## Installation
+          ```bash
+          npm install -g claude-auto-resume
+          ```
+          
+          ## Usage
+          ```bash
+          claude-auto-resume "continue"
+          claude-auto-resume -c "resume task"
+          claude-auto-resume -e "npm test"
+          ```
         draft: false
         prerelease: false

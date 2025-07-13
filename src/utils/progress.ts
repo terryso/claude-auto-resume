@@ -25,7 +25,7 @@ const SPINNER_STYLES = {
   clock: ['🕐', '🕑', '🕒', '🕓', '🕔', '🕕', '🕖', '🕗', '🕘', '🕙', '🕚', '🕛'],
   arrow: ['←', '↖', '↑', '↗', '→', '↘', '↓', '↙'],
   bounce: ['⠁', '⠂', '⠄', '⠂'],
-  toggle: ['◐', '◓', '◑', '◒']
+  toggle: ['◐', '◓', '◑', '◒'],
 };
 
 /**
@@ -96,7 +96,7 @@ export class Spinner implements ProgressIndicator {
 
   private render(): void {
     if (!this.isActive) return;
-    
+
     this.clearLine();
     const frame = this.frames[this.currentFrame];
     process.stdout.write(`${frame} ${this.currentMessage}`);
@@ -115,10 +115,10 @@ export class ProgressBar implements ProgressIndicator {
   private currentStep = 0;
   private isActive = false;
   private currentMessage = '';
-  private startTime: number = 0;
+  private startTime = 0;
   private barWidth = 40;
 
-  constructor(totalSteps: number = 100) {
+  constructor(totalSteps = 100) {
     this.totalSteps = totalSteps;
   }
 
@@ -127,7 +127,7 @@ export class ProgressBar implements ProgressIndicator {
     this.isActive = true;
     this.currentStep = 0;
     this.startTime = Date.now();
-    
+
     // Hide cursor
     process.stdout.write('\x1B[?25l');
     this.render();
@@ -190,7 +190,7 @@ export class ProgressBar implements ProgressIndicator {
     this.clearLine();
     process.stdout.write(
       `${progressBar} ${percentage}% | ${this.currentStep}/${this.totalSteps} | ` +
-      `Elapsed: ${elapsedStr} | ETA: ${etaStr} | ${this.currentMessage}`
+        `Elapsed: ${elapsedStr} | ETA: ${etaStr} | ${this.currentMessage}`
     );
   }
 
@@ -229,7 +229,7 @@ export async function withSpinner<T>(
   style?: keyof typeof SPINNER_STYLES
 ): Promise<T> {
   const spinner = createSpinner(style);
-  
+
   try {
     spinner.start(message);
     const result = await operation();
@@ -250,7 +250,7 @@ export async function withProgress<T>(
   totalSteps: number
 ): Promise<T> {
   const progressBar = createProgressBar(totalSteps);
-  
+
   try {
     progressBar.start(message);
     const result = await operation((step) => progressBar.updateProgress(step));

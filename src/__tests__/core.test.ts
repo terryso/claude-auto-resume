@@ -34,7 +34,7 @@ describe('Core Module', () => {
     // Mock console methods to prevent test output
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
-    
+
     // Mock process.on for progress indicators
     jest.spyOn(process, 'on').mockImplementation(() => process);
     jest.spyOn(process, 'removeListener').mockImplementation(() => process);

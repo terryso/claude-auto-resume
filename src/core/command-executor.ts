@@ -69,7 +69,7 @@ export class CommandExecutor {
     const startTime = Date.now();
     const startTimestamp = Math.floor(startTime / 1000);
     const timeDisplay = TimeUtils.getTimeDisplay(startTimestamp);
-    
+
     console.log(`[INFO] Starting command execution: ${command}`);
     console.log(`[INFO] Start time: ${timeDisplay.absolute} (${timeDisplay.relative})`);
     console.log(

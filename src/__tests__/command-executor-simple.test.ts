@@ -146,10 +146,10 @@ describe('CommandExecutor Simple', () => {
       spawn.mockReturnValue(mockChild);
 
       const promise = CommandExecutor.executeCustomCommand('echo test', false, 1000);
-      
+
       // Fast-forward all timers
       jest.runAllTimers();
-      
+
       const result = await promise;
       expect(result.success).toBe(true);
       expect(result.exitCode).toBe(0);
@@ -172,10 +172,10 @@ describe('CommandExecutor Simple', () => {
       spawn.mockReturnValue(mockChild);
 
       const promise = CommandExecutor.executeCustomCommand('invalid-command', false, 1000);
-      
+
       // Fast-forward all timers
       jest.runAllTimers();
-      
+
       const result = await promise;
       expect(result.success).toBe(false);
     });

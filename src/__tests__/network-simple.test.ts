@@ -33,7 +33,7 @@ describe('NetworkUtils Simple', () => {
     // Mock console methods
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
-    
+
     // Mock process.on for progress indicators
     jest.spyOn(process, 'on').mockImplementation(() => process);
     jest.spyOn(process, 'removeListener').mockImplementation(() => process);
@@ -140,7 +140,7 @@ describe('NetworkUtils Simple', () => {
       it('should handle successful ping on Unix', async () => {
         // Use fake timers for this test to avoid open handles
         jest.useFakeTimers();
-        
+
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: { on: jest.fn() },
@@ -159,10 +159,10 @@ describe('NetworkUtils Simple', () => {
         Object.defineProperty(process, 'platform', { value: 'linux' });
 
         const resultPromise = NetworkUtils.checkConnectivityPing('8.8.8.8');
-        
+
         // Run all timers to complete the test
         jest.runAllTimers();
-        
+
         const result = await resultPromise;
 
         expect(spawn).toHaveBeenCalledWith(
@@ -171,13 +171,13 @@ describe('NetworkUtils Simple', () => {
           expect.any(Object)
         );
         expect(typeof result).toBe('object');
-        
+
         jest.useRealTimers();
       });
 
       it('should handle successful ping on Windows', async () => {
         jest.useFakeTimers();
-        
+
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: { on: jest.fn() },
@@ -204,13 +204,13 @@ describe('NetworkUtils Simple', () => {
           expect.any(Object)
         );
         expect(typeof result).toBe('object');
-        
+
         jest.useRealTimers();
       });
 
       it('should handle ping failure', async () => {
         jest.useFakeTimers();
-        
+
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: {
@@ -236,13 +236,13 @@ describe('NetworkUtils Simple', () => {
 
         expect(typeof result).toBe('object');
         expect(result.connected).toBe(false);
-        
+
         jest.useRealTimers();
       });
 
       it('should handle ping command error', async () => {
         jest.useFakeTimers();
-        
+
         const mockChild = {
           stdout: { on: jest.fn() },
           stderr: { on: jest.fn() },
@@ -262,7 +262,7 @@ describe('NetworkUtils Simple', () => {
 
         expect(typeof result).toBe('object');
         expect(result.connected).toBe(false);
-        
+
         jest.useRealTimers();
       });
     });
