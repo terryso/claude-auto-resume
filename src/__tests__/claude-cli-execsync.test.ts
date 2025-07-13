@@ -50,7 +50,7 @@ describe('ClaudeCLI with execSync', () => {
       const result = await claudeCli.executeClaudeCommand(['-p', 'test']);
 
       expect(mockExecSync).toHaveBeenCalledWith(
-        'claude "-p" "test"',
+        'claude -p test',
         expect.objectContaining({
           encoding: 'utf8',
           env: process.env,
@@ -103,7 +103,7 @@ describe('ClaudeCLI with execSync', () => {
 
       await customCli.executeClaudeCommand(['-p', 'test']);
 
-      expect(mockExecSync).toHaveBeenCalledWith('/custom/claude "-p" "test"', expect.any(Object));
+      expect(mockExecSync).toHaveBeenCalledWith('/custom/claude -p test', expect.any(Object));
     });
 
     it('should handle complex arguments with quotes', async () => {
@@ -112,7 +112,7 @@ describe('ClaudeCLI with execSync', () => {
       await claudeCli.executeClaudeCommand(['-p', 'test with spaces']);
 
       expect(mockExecSync).toHaveBeenCalledWith(
-        'claude "-p" "test with spaces"',
+        'claude -p "test with spaces"',
         expect.any(Object)
       );
     });
@@ -216,7 +216,7 @@ describe('ClaudeCLI with execSync', () => {
 
       expect(result).toBe('Resume output');
       expect(mockExecSync).toHaveBeenCalledWith(
-        'claude "--dangerously-skip-permissions" "-p" "test prompt"',
+        'claude --dangerously-skip-permissions -p "test prompt"',
         expect.any(Object)
       );
     });
@@ -228,7 +228,7 @@ describe('ClaudeCLI with execSync', () => {
 
       expect(result).toBe('Continue output');
       expect(mockExecSync).toHaveBeenCalledWith(
-        'claude "-c" "--dangerously-skip-permissions" "-p" "test prompt"',
+        'claude -c --dangerously-skip-permissions -p "test prompt"',
         expect.any(Object)
       );
     });

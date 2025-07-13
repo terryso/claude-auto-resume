@@ -53,11 +53,16 @@ export class ClaudeCLI {
       new Promise<string>((resolve, reject) => {
         // Build the command string with proper shell escaping
         const quotedArgs = args.map((arg) => {
-          // Use JSON.stringify for proper shell escaping
+          // Only quote arguments that contain spaces or special characters
+          // Don't quote flags like -p, -c, --dangerously-skip-permissions
+          if (arg.startsWith('-') || !/[\s'"\\|&;<>()$`]/.test(arg)) {
+            return arg;
+          }
+          // Use JSON.stringify for proper shell escaping of user content
           return JSON.stringify(arg);
         });
 
-        const command = `${this.cliPath} ${args.join(' ')}`;
+        const command = `${this.cliPath} ${quotedArgs.join(' ')}`;
 
         if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
           console.debug(`[DEBUG] Executing with shell: ${command}`);
@@ -209,7 +214,7 @@ export class ClaudeCLI {
     }
 
     // Add -p flag for print mode and prompt as positional argument
-    args.push('-p', `"${prompt}"`);
+    args.push('-p', prompt);
     return args;
   }
 
