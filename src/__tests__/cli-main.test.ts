@@ -12,11 +12,11 @@ jest.mock('../cli/commands');
 jest.mock('../core/command-executor');
 jest.mock('child_process');
 
-import { Command } from 'commander';
+// CLI main tests
 import { main } from '../index';
 
 describe('CLI Main', () => {
-  let mockProgram: jest.Mocked<Command>;
+  // Test setup variables
   let mockSetupCLI: jest.Mock;
   let originalArgv: string[];
 
@@ -27,10 +27,7 @@ describe('CLI Main', () => {
     originalArgv = process.argv;
     process.argv = ['node', 'test'];
 
-    // Mock program instance methods
-    mockProgram = {
-      parseAsync: jest.fn().mockResolvedValue(undefined),
-    } as any;
+    // Mock program setup for testing
 
     // Mock setupCLI
     const { setupCLI } = require('../cli/commands');

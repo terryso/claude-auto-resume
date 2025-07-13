@@ -4,7 +4,7 @@
 
 import { spawn } from 'child_process';
 import { ClaudeAutoResumeError } from '../utils/errors';
-import { createSpinner, withSpinner } from '../utils/progress';
+import { createSpinner } from '../utils/progress';
 import { logger } from '../utils';
 
 /**
@@ -50,11 +50,10 @@ export class NetworkUtils {
         timeout: NetworkUtils.TIMEOUT_MS,
       });
 
-      let stdout = '';
       let stderr = '';
 
-      child.stdout?.on('data', (data) => {
-        stdout += data.toString();
+      child.stdout?.on('data', () => {
+        // Ping output not needed for connectivity check
       });
 
       child.stderr?.on('data', (data) => {

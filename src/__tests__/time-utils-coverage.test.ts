@@ -183,7 +183,7 @@ describe('TimeUtils Branch Coverage', () => {
         if (sigintHandler) {
           try {
             sigintHandler();
-          } catch (error) {
+          } catch {
             // Expected due to mocked process.exit
           }
         }
@@ -191,7 +191,7 @@ describe('TimeUtils Branch Coverage', () => {
 
       try {
         await promise;
-      } catch (error) {
+      } catch {
         // Expected due to process.exit mock
       }
 

@@ -289,7 +289,7 @@ describe('Core Module', () => {
             if (handler) {
               handler();
             }
-          } catch (e) {
+          } catch {
             // Expected - process.exit throws
           }
         }

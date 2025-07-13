@@ -67,7 +67,7 @@ describe('Main Function Integration', () => {
 
   it('should handle Error instances in main catch block', async () => {
     // Mock setupCLI to throw an Error
-    const setupCLIMock = require('../cli/commands');
+    // Mock CLI setup module for testing
     jest.doMock('../cli/commands', () => ({
       setupCLI: jest.fn().mockRejectedValue(new Error('Test error')),
     }));

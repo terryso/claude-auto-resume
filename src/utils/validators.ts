@@ -214,7 +214,6 @@ export function validateTimestampWithFeedback(timestamp: unknown): {
   }
 
   // Check if timestamp is reasonable (not too far in past or future)
-  const now = Date.now();
   const year1970 = new Date('1970-01-01').getTime();
   const year2100 = new Date('2100-01-01').getTime();
 
@@ -722,8 +721,7 @@ export function validateArgumentCombinationsWithFeedback(options: CLIOptions): {
  */
 export function validateConfigurationPrecedence(
   cliArgs: Partial<CLIOptions>,
-  envVars: Record<string, string | undefined>,
-  defaults: CLIConfig
+  envVars: Record<string, string | undefined>
 ): { valid: boolean; precedenceOrder: string[] } {
   const precedenceOrder: string[] = [];
 

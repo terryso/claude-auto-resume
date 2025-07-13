@@ -11,7 +11,6 @@ import { ClaudeCLI, CommandExecutor, TimeUtils } from '../core';
 import {
   logger,
   LogLevel,
-  validatePrompt,
   validatePromptWithFeedback,
   validateTimeoutWithFeedback,
   validateCommandWithFeedback,
@@ -45,7 +44,7 @@ function getVersion(): string {
     }
 
     throw new Error('No package.json found in any expected location');
-  } catch (error) {
+  } catch {
     // Fallback to reading from npm environment if available
     try {
       const { execSync } = require('child_process');
@@ -228,7 +227,7 @@ Examples:
             // Countdown with progress indication
             await TimeUtils.waitWithCountdown(waitSeconds);
           }
-          
+
           // Re-check network connectivity before resuming (skip in execute mode)
           if (!options.execute) {
             logger.info('Re-checking network connectivity before resuming...');

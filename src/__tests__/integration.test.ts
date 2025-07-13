@@ -10,16 +10,13 @@ describe('Integration Tests', () => {
   let program: Command;
   let originalExit: typeof process.exit;
   let originalConsoleError: typeof console.error;
-  let exitCode: number;
+  // Integration test variables
 
   beforeEach(() => {
     program = new Command();
-    exitCode = 0;
-
     // Mock process.exit to capture exit codes
     originalExit = process.exit;
-    process.exit = jest.fn((code?: number) => {
-      exitCode = code || 0;
+    process.exit = jest.fn(() => {
       throw new Error('Process exit called');
     }) as any;
 
@@ -35,7 +32,7 @@ describe('Integration Tests', () => {
 
   describe('CLI Integration', () => {
     it('should setup CLI with configuration', async () => {
-      const config = loadConfiguration();
+      // Load configuration for testing
       await setupCLI(program);
 
       expect(program.name()).toBe('claude-auto-resume');

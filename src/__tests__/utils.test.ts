@@ -230,7 +230,7 @@ describe('Utils Module', () => {
 
     it('should create directory for log file if it does not exist', () => {
       const fs = require('fs');
-      const path = require('path');
+      // Path module not needed for this test
 
       // Mock all file system operations to prevent actual file creation
       const existsSpy = jest.spyOn(fs, 'existsSync');
@@ -597,15 +597,7 @@ describe('Utils Module', () => {
       it('should validate configuration precedence', () => {
         const result = validateConfigurationPrecedence(
           { prompt: 'test' },
-          { CLAUDE_AUTO_RESUME_WAIT_BUFFER: '30' },
-          {
-            defaultPrompt: 'continue',
-            defaultTimeout: 120000,
-            maxRetries: 3,
-            claudeCliPath: 'claude',
-            waitBuffer: 0,
-            skipPermissions: true,
-          }
+          { CLAUDE_AUTO_RESUME_WAIT_BUFFER: '30' }
         );
 
         expect(result.valid).toBe(true);

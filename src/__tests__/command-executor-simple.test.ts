@@ -247,7 +247,7 @@ describe('CommandExecutor Simple', () => {
 
     it('should handle showSecurityWarning countdown', async () => {
       const originalSetTimeout = global.setTimeout;
-      const setTimeoutSpy = jest.fn((callback, delay) => {
+      const setTimeoutSpy = jest.fn((callback) => {
         // Immediately call callback for testing
         callback();
         return 123 as any;

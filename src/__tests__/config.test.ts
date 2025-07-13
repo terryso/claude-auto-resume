@@ -3,7 +3,7 @@
  */
 
 import { loadConfiguration } from '../config/loader';
-import type { CLIConfig } from '../config/types';
+// Configuration tests without unused imports
 
 describe('Configuration', () => {
   let originalEnv: NodeJS.ProcessEnv;

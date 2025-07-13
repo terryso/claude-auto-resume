@@ -159,7 +159,6 @@ export class DebugUtils {
 
     try {
       // OS Information
-      const memInfo = process.memoryUsage();
       const osInfo = {
         platform: os.platform(),
         arch: os.arch(),

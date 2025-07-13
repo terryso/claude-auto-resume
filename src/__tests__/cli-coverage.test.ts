@@ -53,9 +53,9 @@ describe('CLI Commands Coverage', () => {
         hasLimit: false,
         resumeTimestamp: null,
         rawOutput: 'No usage limit',
-        waitSeconds: 0
+        waitSeconds: 0,
       }),
-      resume: jest.fn().mockResolvedValue('Test output')
+      resume: jest.fn().mockResolvedValue('Test output'),
     };
     ClaudeCLI.mockImplementation(() => mockClaudeInstance);
 
@@ -70,8 +70,8 @@ describe('CLI Commands Coverage', () => {
     // Mock dynamic import for NetworkUtils
     jest.doMock('../core/network', () => ({
       NetworkUtils: {
-        checkConnectivity: jest.fn().mockResolvedValue(true)
-      }
+        checkConnectivity: jest.fn().mockResolvedValue(true),
+      },
     }));
   });
 
@@ -88,7 +88,7 @@ describe('CLI Commands Coverage', () => {
       // Simulate debug option
       try {
         await program.parseAsync(['node', 'test', '--debug', 'test prompt']);
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
 
@@ -100,7 +100,7 @@ describe('CLI Commands Coverage', () => {
 
       try {
         await program.parseAsync(['node', 'test', '--verbose', 'test prompt']);
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
 
@@ -112,7 +112,7 @@ describe('CLI Commands Coverage', () => {
 
       try {
         await program.parseAsync(['node', 'test', '--quiet', 'test prompt']);
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
     });
@@ -122,7 +122,7 @@ describe('CLI Commands Coverage', () => {
 
       try {
         await program.parseAsync(['node', 'test', '--continue', 'test prompt']);
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
     });
@@ -132,7 +132,7 @@ describe('CLI Commands Coverage', () => {
 
       try {
         await program.parseAsync(['node', 'test', '--execute', 'echo test']);
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
     });
@@ -142,7 +142,7 @@ describe('CLI Commands Coverage', () => {
 
       try {
         await program.parseAsync(['node', 'test', '--cmd', 'echo test']);
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
     });
@@ -152,7 +152,7 @@ describe('CLI Commands Coverage', () => {
 
       try {
         await program.parseAsync(['node', 'test', '--test-mode', '1', 'test prompt']);
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
     }, 10000);
@@ -162,7 +162,7 @@ describe('CLI Commands Coverage', () => {
 
       try {
         await program.parseAsync(['node', 'test', '--check']);
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
     });
@@ -205,7 +205,7 @@ describe('CLI Commands Coverage', () => {
       try {
         await program.parseAsync(['node', 'test', '']);
         // Should use default prompt 'continue', no exit expected
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
     });
@@ -216,7 +216,7 @@ describe('CLI Commands Coverage', () => {
       try {
         await program.parseAsync(['node', 'test', 'test & echo']);
         // Should not exit, but might show warnings
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
     });
@@ -236,7 +236,7 @@ describe('CLI Commands Coverage', () => {
       try {
         await program.parseAsync(['node', 'test', '--execute', 'rm -rf /']);
         // Should not exit, but show warnings
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
     });
@@ -247,7 +247,7 @@ describe('CLI Commands Coverage', () => {
       try {
         await program.parseAsync(['node', 'test', '--execute', 'echo $(whoami)']);
         // Should pass validation but show warnings
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
     });
@@ -273,7 +273,7 @@ describe('CLI Commands Coverage', () => {
 
       try {
         await program.parseAsync(['node', 'test', 'test prompt']);
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
 
@@ -288,7 +288,7 @@ describe('CLI Commands Coverage', () => {
 
       try {
         await program.parseAsync(['node', 'test', 'test prompt']);
-      } catch (error) {
+      } catch {
         // Expected due to mocked dependencies
       }
 

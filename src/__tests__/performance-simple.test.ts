@@ -81,7 +81,7 @@ describe('Performance Tests', () => {
       testOutputs.forEach((output) => {
         try {
           claudeCli.parseUsageLimitOutput(output);
-        } catch (error) {
+        } catch {
           // Some outputs may throw errors, that's fine for performance testing
         }
       });

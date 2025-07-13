@@ -110,7 +110,7 @@ describe('CLI Commands Extended', () => {
     try {
       // Simulate command execution with empty prompt
       await program.parseAsync(['node', 'cli.js', '']);
-    } catch (error) {
+    } catch {
       expect(exitCode).toBe(1);
     }
   });
@@ -133,7 +133,7 @@ describe('CLI Commands Extended', () => {
     try {
       // Test conflicting flags: execute and continue
       await program.parseAsync(['node', 'cli.js', '-e', 'echo test', '-c']);
-    } catch (error) {
+    } catch {
       expect(exitCode).toBe(1);
     }
   });
@@ -156,7 +156,7 @@ describe('CLI Commands Extended', () => {
     try {
       // Test empty execute command
       await program.parseAsync(['node', 'cli.js', '-e', '   ']);
-    } catch (error) {
+    } catch {
       expect(exitCode).toBe(1);
     }
   });
@@ -167,7 +167,7 @@ describe('CLI Commands Extended', () => {
     try {
       // Test invalid test mode
       await program.parseAsync(['node', 'cli.js', '--test-mode', '-5', '-e', 'echo test']);
-    } catch (error) {
+    } catch {
       expect(exitCode).toBe(1);
     }
   });
@@ -181,7 +181,7 @@ describe('CLI Commands Extended', () => {
 
     try {
       await program.parseAsync(['node', 'cli.js', 'test']);
-    } catch (error) {
+    } catch {
       expect(exitCode).toBe(1);
     }
 

@@ -3,7 +3,7 @@
  */
 
 import { ClaudeAutoResumeError } from '../utils/errors';
-import { createProgressBar, withProgress } from '../utils/progress';
+// Time utils only use basic timing, no progress bars needed
 import { logger } from '../utils';
 
 /**

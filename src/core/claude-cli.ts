@@ -2,9 +2,9 @@
  * Claude CLI interaction utilities
  */
 
-import { spawn, exec, execSync } from 'child_process';
+import { execSync } from 'child_process';
 import { ClaudeAutoResumeError } from '../utils/errors';
-import { createSpinner, withSpinner } from '../utils/progress';
+import { withSpinner } from '../utils/progress';
 
 /**
  * Interface for usage limit result parsing
@@ -162,7 +162,7 @@ export class ClaudeCLI {
         result.hasLimit = true;
         result.resumeTimestamp = timestamp;
         result.waitSeconds = waitSeconds;
-      } catch (error) {
+      } catch {
         throw new ClaudeAutoResumeError(
           `Invalid timestamp extraction from Claude output: ${timestampStr}`,
           2,
