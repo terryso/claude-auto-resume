@@ -132,7 +132,7 @@ describe('Core Module', () => {
 
       await claudeCli.resume('test prompt', false, true);
 
-      expect(spy).toHaveBeenCalledWith(['--dangerously-skip-permissions', '-p', 'test prompt']);
+      expect(spy).toHaveBeenCalledWith(['--dangerously-skip-permissions', '-p', 'test prompt'], 0);
       spy.mockRestore();
     });
 
@@ -146,7 +146,7 @@ describe('Core Module', () => {
         '--dangerously-skip-permissions',
         '-p',
         'test prompt',
-      ]);
+      ], 0);
       spy.mockRestore();
     });
   });

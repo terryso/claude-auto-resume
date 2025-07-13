@@ -67,27 +67,31 @@ export class ClaudeCLI {
 
         try {
           // Use execSync for maximum compatibility with command line execution
-          const result = execSync(command, {
+          const execOptions: any = {
             encoding: 'utf8',
-            timeout: timeoutMs,
             env: process.env, // Use complete environment as-is
             cwd: process.cwd(),
             shell: process.env.SHELL || '/bin/bash', // Explicitly use shell
             stdio: ['inherit', 'pipe', 'pipe'], // Inherit stdin, pipe stdout/stderr
-          });
+          };
+
+          // Only set timeout if timeoutMs > 0 (0 means no timeout)
+          if (timeoutMs > 0) {
+            execOptions.timeout = timeoutMs;
+          }
+
+          const result = execSync(command, execOptions);
 
           resolve(result);
         } catch (error: any) {
           // console.log('error: ', error.stdout);
           if (error.status === null) {
             // Timeout or signal
-            reject(
-              new ClaudeAutoResumeError(
-                `Claude CLI command timed out after ${timeoutMs}ms`,
-                1,
-                `Command: ${command}`
-              )
-            );
+            const timeoutMessage =
+              timeoutMs > 0
+                ? `Claude CLI command timed out after ${timeoutMs}ms`
+                : 'Claude CLI command was terminated by signal';
+            reject(new ClaudeAutoResumeError(timeoutMessage, 1, `Command: ${command}`));
           } else if (error.code === 'ENOENT') {
             reject(
               new ClaudeAutoResumeError(
@@ -228,7 +232,9 @@ export class ClaudeCLI {
     const args = this.buildClaudeCommand(prompt, continueMode, skipPermissions);
 
     try {
-      const output = await this.executeClaudeCommand(args);
+      // For resume operations, use a much longer timeout or no timeout
+      // Claude interactions can take a very long time depending on the task
+      const output = await this.executeClaudeCommand(args, 0); // 0 means no timeout
       return output;
     } catch (error) {
       if (error instanceof ClaudeAutoResumeError) {
