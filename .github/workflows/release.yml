@@ -124,9 +124,9 @@ $CHANGELOG_CONTENT
 
 ---
 
-📋 **查看完整更新日志**: [CHANGELOG.md](https://github.com/terryso/claude-auto-resume/blob/main/CHANGELOG.md)
+📋 **View full changelog**: [CHANGELOG.md](https://github.com/terryso/claude-auto-resume/blob/main/CHANGELOG.md)
 
-⚠️ **安全提示**: 默认使用 \`--dangerously-skip-permissions\` 标志，仅在可信环境中使用。"
+⚠️ **Security Notice**: Uses \`--dangerously-skip-permissions\` flag by default. Only use in trusted environments."
             fi
           else
             CHANGELOG_CONTENT="### 🚀 Claude Auto Resume ${{ steps.get_version.outputs.VERSION }}
