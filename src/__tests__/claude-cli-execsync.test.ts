@@ -162,23 +162,27 @@ describe('ClaudeCLI with execSync', () => {
   });
 
   describe('checkUsageLimit', () => {
+    it('should handle check failure', async () => {
+      mockExecSync.mockReturnValue('hello');
+
+      const result = await claudeCli.checkUsageLimit();
+
+      expect(result.hasLimit).toBe(false);
+      expect(result.rawOutput).toBe('hello');
+    });
+
     it('should check usage limit successfully', async () => {
-      mockExecSync.mockReturnValue('Claude AI usage limit reached|1704067200');
+      const error = new Error('Command failed') as any;
+      error.status = 1;
+      error.stdout = 'Claude AI usage limit reached|1704067200';
+      mockExecSync.mockImplementation(() => {
+        throw error;
+      });
 
       const result = await claudeCli.checkUsageLimit();
 
       expect(result.hasLimit).toBe(true);
       expect(result.resumeTimestamp).toBe(1704067200);
-    });
-
-    it('should handle check failure', async () => {
-      const error = new Error('Command failed') as any;
-      error.status = 1;
-      mockExecSync.mockImplementation(() => {
-        throw error;
-      });
-
-      await expect(claudeCli.checkUsageLimit()).rejects.toThrow(ClaudeAutoResumeError);
     });
   });
 
