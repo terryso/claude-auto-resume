@@ -1,6 +1,6 @@
 {
   "name": "claude-auto-resume",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Automatically resumes Claude CLI tasks when usage limits are lifted. Supports both npm install and npx usage. TypeScript-based with comprehensive tooling.",
   "main": "dist/index.js",
   "bin": {
@@ -34,7 +34,14 @@
     "type": "git",
     "url": "git+https://github.com/terryso/claude-auto-resume.git"
   },
-  "keywords": ["claude", "ai", "cli", "automation", "resume", "typescript"],
+  "keywords": [
+    "claude",
+    "ai",
+    "cli",
+    "automation",
+    "resume",
+    "typescript"
+  ],
   "author": "Nick <nick@example.com>",
   "license": "MIT",
   "bugs": {
