@@ -16,7 +16,7 @@ const DEFAULT_CONFIG: CLIConfig = {
   defaultTimeout: 120000, // 2 minutes
   maxRetries: 3,
   claudeCliPath: 'claude',
-  waitBuffer: 0,
+  waitBuffer: 10,
   skipPermissions: true,
   logFile: undefined,
 };

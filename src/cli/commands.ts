@@ -17,7 +17,6 @@ import {
   validateCommandWithFeedback,
 } from '../utils';
 import { DebugUtils } from '../utils/debug';
-import { NetworkUtils } from '../core/network';
 import type { CLIConfig } from '../config/types';
 
 /**
@@ -228,6 +227,22 @@ Examples:
           if (waitSeconds > 0) {
             // Countdown with progress indication
             await TimeUtils.waitWithCountdown(waitSeconds);
+          }
+          
+          // Re-check network connectivity before resuming (skip in execute mode)
+          if (!options.execute) {
+            logger.info('Re-checking network connectivity before resuming...');
+            try {
+              const { NetworkUtils } = await import('../core/network');
+              const isConnected = await NetworkUtils.checkConnectivity();
+              if (!isConnected) {
+                logger.error('Network connectivity lost during wait period.');
+                logger.error('Please check your internet connection and run the script again.');
+                process.exit(3);
+              }
+            } catch (error) {
+              logger.warn('Network connectivity check failed, but continuing...', { error });
+            }
           }
         }
 

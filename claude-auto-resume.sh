@@ -7,7 +7,7 @@
 VERSION="1.3.0"
 
 # Environment variable configuration with defaults
-WAIT_BUFFER=0                    # Extra wait time in seconds (default: 0)
+WAIT_BUFFER=10                   # Extra wait time in seconds (default: 10)
 SKIP_PERMISSIONS=true            # Control permission skipping (default: true)
 LOG_FILE=""                      # Optional log file path (default: empty/no logging)
 
@@ -596,8 +596,8 @@ if [ -n "$LIMIT_MSG" ]; then
     fi
   fi
 
-  # Brief pause before resuming (interruptible)
-  sleep 10
+  # Brief pause handled by WAIT_BUFFER (default 10 seconds)
+  # No additional sleep needed
   
   # Re-check network connectivity before resuming (skip in execute mode)
   if [ "$EXECUTE_MODE" = false ]; then

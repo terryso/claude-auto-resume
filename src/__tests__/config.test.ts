@@ -42,7 +42,7 @@ describe('Configuration', () => {
       expect(config.defaultTimeout).toBe(120000);
       expect(config.maxRetries).toBe(3);
       expect(config.claudeCliPath).toBe('claude');
-      expect(config.waitBuffer).toBe(0);
+      expect(config.waitBuffer).toBe(10);
       expect(config.skipPermissions).toBe(true);
       expect(config.logFile).toBeUndefined();
     });
@@ -153,7 +153,7 @@ describe('Configuration', () => {
       process.env.CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS = '';
 
       const config = loadConfiguration();
-      expect(config.waitBuffer).toBe(0); // Default value
+      expect(config.waitBuffer).toBe(10); // Default value
       expect(config.skipPermissions).toBe(true); // Default value
     });
   });

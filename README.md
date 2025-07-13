@@ -1,5 +1,19 @@
 # Claude Auto-Resume
 
+<div align="center">
+
+[![GitHub stars](https://img.shields.io/github/stars/terryso/claude-auto-resume.svg)](https://github.com/terryso/claude-auto-resume/stargazers)
+[![NPM Version](https://badge.fury.io/js/claude-auto-resume.svg)](https://www.npmjs.com/package/claude-auto-resume)
+[![NPM Downloads](https://img.shields.io/npm/dm/claude-auto-resume.svg)](https://www.npmjs.com/package/claude-auto-resume)
+[![GitHub License](https://img.shields.io/github/license/terryso/claude-auto-resume?style=flat-square)](https://github.com/terryso/claude-auto-resume/blob/main/LICENSE)
+[![Node Version](https://img.shields.io/node/v/claude-auto-resume?style=flat-square&color=brightgreen)](https://nodejs.org/)
+
+[![CI](https://img.shields.io/github/actions/workflow/status/terryso/claude-auto-resume/ci.yml?branch=develop&style=flat-square&label=CI)](https://github.com/terryso/claude-auto-resume/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/actions/workflow/status/terryso/claude-auto-resume/release.yml?style=flat-square&label=Release)](https://github.com/terryso/claude-auto-resume/actions/workflows/release.yml)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-项目文档-blue)](https://deepwiki.com/terryso/claude-auto-resume)
+
+</div>
+
 🚀 **Now Available as a TypeScript CLI Tool!** - Enhanced reliability, better error handling, and modern Node.js distribution.
 
 A TypeScript CLI utility that automatically resumes Claude CLI tasks when usage limits are lifted, or executes custom shell commands after waiting periods. It detects Claude usage restrictions, waits intelligently, and resumes task execution automatically.
