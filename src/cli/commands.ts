@@ -243,22 +243,31 @@ Examples:
               logger.warn('Network connectivity check failed, but continuing...', { error });
             }
           }
-        }
 
-        // Resume Claude session or execute custom command
-        if (options.execute) {
-          logger.info('Executing custom command after usage limit wait period');
-          await CommandExecutor.executeWithSafeguards(options.execute);
+          // Resume Claude session or execute custom command after wait
+          if (options.execute) {
+            logger.info('Executing custom command after usage limit wait period');
+            await CommandExecutor.executeWithSafeguards(options.execute);
+          } else {
+            const output = await claudeCli.resume(
+              finalPrompt,
+              options.continue || false,
+              config.skipPermissions
+            );
+            // Display Claude output like shell script
+            if (output && output.trim()) {
+              console.log('CLAUDE_OUTPUT:');
+              console.log(output);
+            }
+          }
         } else {
-          const output = await claudeCli.resume(
-            finalPrompt,
-            options.continue || false,
-            config.skipPermissions
-          );
-          // Display Claude output like shell script
-          if (output && output.trim()) {
-            console.log('CLAUDE_OUTPUT:');
-            console.log(output);
+          // No usage limit detected - match shell script behavior
+          if (options.execute) {
+            logger.info('No usage limit detected. Custom command will only execute after a usage limit wait period.');
+            logger.info('Since there is no usage limit, the custom command will not be executed.');
+            logger.info('Use claude-auto-resume in execute mode only when you expect usage limits.');
+          } else {
+            logger.info('No waiting required. Task completed.');
           }
         }
       } catch (error) {
