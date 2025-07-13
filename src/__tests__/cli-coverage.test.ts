@@ -11,6 +11,7 @@ jest.mock('../config/loader');
 jest.mock('../core/claude-cli');
 jest.mock('../core/command-executor');
 jest.mock('../core/network');
+jest.mock('../core/time-utils');
 
 describe('CLI Commands Coverage', () => {
   let program: Command;
@@ -39,6 +40,11 @@ describe('CLI Commands Coverage', () => {
       skipPermissions: false,
       logFile: undefined
     });
+
+    // Mock TimeUtils to prevent actual countdown
+    const { TimeUtils } = require('../core/time-utils');
+    jest.mocked(TimeUtils.waitWithCountdown).mockResolvedValue(undefined);
+    jest.mocked(TimeUtils.timestampToString).mockReturnValue('2024-01-01 12:00:00');
   });
 
   afterEach(() => {

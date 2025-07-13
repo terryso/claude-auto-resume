@@ -303,7 +303,7 @@ export class TimeUtils {
   }
 
   /**
-   * Waits for the specified duration with a live countdown display and progress bar
+   * Waits for the specified duration with a simple countdown display like the shell script
    * Includes interrupt handling for graceful termination
    */
   static async waitWithCountdown(seconds: number, onInterrupt?: () => void): Promise<void> {
@@ -311,12 +311,11 @@ export class TimeUtils {
 
     let remaining = seconds;
     let interrupted = false;
-    const progressBar = createProgressBar(seconds);
 
     // Set up interrupt handler
     const handleInterrupt = () => {
       interrupted = true;
-      progressBar.stop();
+      process.stdout.write('\n');
       logger.info('Interrupt received. Exiting gracefully...');
       if (onInterrupt) {
         onInterrupt();
@@ -328,34 +327,27 @@ export class TimeUtils {
     process.on('SIGTERM', handleInterrupt);
 
     try {
-      const timeDisplay = TimeUtils.getTimeDisplay(Date.now() / 1000 + seconds);
+      const resumeTime = Math.floor(Date.now() / 1000) + seconds;
       
-      logger.info('Starting countdown timer', {
-        duration: TimeUtils.formatDuration(seconds),
-        resumeTime: timeDisplay.absolute,
-        relative: timeDisplay.relative
-      });
+      // Show initial resume time
+      logger.info(`Resume time: ${TimeUtils.timestampToString(resumeTime)}`);
+      logger.info(`Waiting ${seconds} seconds...`);
       
-      progressBar.start(`Waiting ${TimeUtils.formatDuration(seconds)} until resume time. Press Ctrl+C to interrupt.`);
-
+      // Simple countdown like shell script
       while (remaining > 0 && !interrupted) {
-        const elapsed = seconds - remaining;
-        const timeDisplay = TimeUtils.getTimeDisplay(Date.now() / 1000 + remaining);
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+        const secs = remaining % 60;
         
-        progressBar.updateProgress(elapsed);
-        progressBar.update(
-          `${TimeUtils.formatDurationShort(remaining)} remaining (Resume ${timeDisplay.relative}). Press Ctrl+C to interrupt.`
-        );
-
+        process.stdout.write(`\rResuming in ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}...`);
+        
         await new Promise((resolve) => setTimeout(resolve, 1000));
         remaining--;
       }
 
       if (!interrupted) {
-        progressBar.succeed('Wait period completed. Resuming Claude session...');
-        logger.info('Countdown completed successfully', {
-          duration: TimeUtils.formatDuration(seconds)
-        });
+        process.stdout.write('\r✅ Wait period completed. Resuming Claude session...           \n');
+        logger.info('Wait period completed, resuming...');
       }
     } finally {
       // Clean up interrupt handlers

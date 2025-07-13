@@ -23,7 +23,8 @@ describe('CLI Commands', () => {
 
   it('should have version command', async () => {
     await setupCLI(program);
-    expect(program.version()).toBe('1.3.0');
+    // Version should be read from package.json
+    expect(program.version()).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it('should have expected options', async () => {

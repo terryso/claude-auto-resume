@@ -39,7 +39,7 @@ describe('Integration Tests', () => {
       await setupCLI(program);
 
       expect(program.name()).toBe('claude-auto-resume');
-      expect(program.version()).toBe('1.3.0');
+      expect(program.version()).toMatch(/^\d+\.\d+\.\d+/);
 
       // Verify options exist
       const options = program.options.map((opt) => opt.long);

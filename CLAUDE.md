@@ -73,6 +73,24 @@ The project follows a single-file architecture:
 - `claude` CLI tool (must be installed and in PATH)
 - Cross-platform compatibility (Linux/macOS date command differences handled)
 
+## Network Configuration
+
+### Proxy Settings
+If you're using a VPN or proxy (especially common in China), ensure the TypeScript version can access the same proxy settings as your shell:
+
+```bash
+# Set proxy environment variables before running
+export http_proxy=http://127.0.0.1:7890
+export https_proxy=http://127.0.0.1:7890
+export HTTP_PROXY=http://127.0.0.1:7890
+export HTTPS_PROXY=http://127.0.0.1:7890
+
+# Then run claude-auto-resume
+claude-auto-resume --test-mode 5 -p "test message"
+```
+
+**Note**: The shell script version inherits terminal proxy settings automatically, but the TypeScript version requires explicit environment variable configuration.
+
 ## Error Handling
 
 The script includes robust error handling for:
@@ -80,6 +98,7 @@ The script includes robust error handling for:
 - Claude CLI execution failures (exit code 1)
 - Resume command failures (exit code 4)
 - Cross-platform date formatting differences
+- Network connectivity issues (proxy configuration required)
 
 ## Testing
 

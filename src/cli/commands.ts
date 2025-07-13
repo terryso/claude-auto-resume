@@ -3,6 +3,8 @@
  */
 
 import { Command } from 'commander';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { CLIOptions } from './types';
 import { loadConfiguration } from '../config';
 import { ClaudeCLI, CommandExecutor, TimeUtils } from '../core';
@@ -19,6 +21,20 @@ import { NetworkUtils } from '../core/network';
 import type { CLIConfig } from '../config/types';
 
 /**
+ * Get version from package.json
+ */
+function getVersion(): string {
+  try {
+    const packagePath = join(__dirname, '..', '..', 'package.json');
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
+    return packageJson.version;
+  } catch (error) {
+    console.error('Failed to read version from package.json');
+    return 'unknown';
+  }
+}
+
+/**
  * Sets up the CLI commands and options
  */
 export async function setupCLI(program: Command): Promise<void> {
@@ -27,7 +43,7 @@ export async function setupCLI(program: Command): Promise<void> {
   program
     .name('claude-auto-resume')
     .description('Automatically resumes Claude CLI tasks after usage limits are lifted')
-    .version('1.3.0')
+    .version(getVersion())
     .option('-p, --prompt <prompt>', 'Custom prompt to send to Claude (default: "continue")')
     .option('-c, --continue', 'Continue previous conversation instead of starting new session')
     .option('-e, --execute <command>', 'Execute custom command after usage limit wait period')
@@ -48,93 +64,13 @@ export async function setupCLI(program: Command): Promise<void> {
     .addHelpText(
       'after',
       `
-BASIC USAGE:
+Examples:
   $ claude-auto-resume                          # Default prompt "continue"
   $ claude-auto-resume "fix the bug"            # Custom prompt
-  $ claude-auto-resume -p "continue coding"     # Custom prompt via flag
-  $ claude-auto-resume -c "review my changes"   # Continue previous conversation
+  $ claude-auto-resume -c "review my changes"   # Continue conversation
+  $ claude-auto-resume -e "npm test"            # Run command after wait
 
-CUSTOM COMMAND EXECUTION:
-  $ claude-auto-resume -e "npm test"            # Run tests after usage limit
-  $ claude-auto-resume --cmd "python app.py"   # Run Python app (alias for -e)
-  $ claude-auto-resume -e "git push origin main" # Deploy after waiting
-
-LOGGING & VERBOSITY:
-  $ claude-auto-resume --verbose "help me"      # Detailed output (INFO level)
-  $ claude-auto-resume --quiet "continue"       # Errors only (ERROR level)
-  $ claude-auto-resume --debug "fix this"       # Full diagnostic output
-  $ CLAUDE_AUTO_RESUME_LOG_FILE=app.log claude-auto-resume "debug" # Log to file
-
-SYSTEM ADMINISTRATION:
-  $ claude-auto-resume --check                  # System information and health
-  $ claude-auto-resume --test-mode 30 "test"    # [DEV] Simulate 30s usage limit
-
-INSTALLATION:
-  Global installation:
-    $ npm install -g claude-auto-resume
-    $ claude-auto-resume "help me code"
-
-  Without installation:
-    $ npx claude-auto-resume [options] [prompt]
-
-ENVIRONMENT VARIABLES:
-  CLAUDE_AUTO_RESUME_WAIT_BUFFER=30           # Add 30s buffer to wait time
-  CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false   # Require permission prompts
-  CLAUDE_AUTO_RESUME_LOG_FILE=/path/to.log    # Enable file logging
-
-COMMON USAGE SCENARIOS:
-
-  Development Workflow:
-    $ claude-auto-resume -c "review and test my code"
-    $ claude-auto-resume -e "npm run build && npm test"
-
-  Code Reviews:
-    $ claude-auto-resume "please review this pull request"
-    $ claude-auto-resume -c "explain the changes in detail"
-
-  Debugging:
-    $ claude-auto-resume --debug "help debug this error"
-    $ claude-auto-resume -v "analyze the performance issue"
-
-  Long-running Tasks:
-    $ claude-auto-resume -e "npm run deploy:production"
-    $ claude-auto-resume --cmd "docker build -t myapp ."
-
-TROUBLESHOOTING:
-
-  Common Issues:
-    
-    Problem: "Claude CLI not found"
-    Solution: Install Claude CLI first: npm install -g @anthropic/claude-cli
-              Ensure it's in your PATH: which claude
-
-    Problem: "Usage limit reached but no timestamp"
-    Solution: Check Claude CLI output format and ensure version compatibility
-              Use --debug flag for detailed diagnostic information
-
-    Problem: "Permission denied" errors
-    Solution: Set CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false for manual control
-              Check file permissions for log files and working directory
-
-    Problem: "Network connectivity issues"
-    Solution: Check internet connection and firewall settings
-              Use --debug for network diagnostic information
-
-    Problem: "Command execution fails"
-    Solution: Test command manually first: <your-command>
-              Use absolute paths for commands and files
-              Check command syntax and permissions
-
-  Getting Help:
-    $ claude-auto-resume --check                # System diagnostics
-    $ claude-auto-resume --debug "test"         # Verbose debugging output
-    Report issues: https://github.com/anthropics/claude-auto-resume/issues
-
-⚠️  SECURITY WARNING:
-    This tool uses --dangerously-skip-permissions by default, which bypasses
-    Claude's safety prompts. Only use in trusted environments with trusted commands.
-    
-    To disable: export CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS=false`
+⚠️  Uses --dangerously-skip-permissions by default. Only use in trusted environments.`
     )
     .action(async (promptArg: string | undefined, options: CLIOptions) => {
       try {
@@ -231,10 +167,32 @@ TROUBLESHOOTING:
         const claudeCli = new ClaudeCLI(config.claudeCliPath);
 
         // Check for usage limits and handle accordingly
-        const limitStatus = await claudeCli.checkUsageLimit();
+        let limitStatus;
+        if (options.testMode) {
+          // Simulate usage limit for test mode
+          const currentTime = Math.floor(Date.now() / 1000);
+          limitStatus = {
+            hasLimit: true,
+            resumeTimestamp: currentTime + options.testMode,
+            rawOutput: `Claude AI usage limit reached|${currentTime + options.testMode}`,
+            waitSeconds: options.testMode
+          };
+          logger.info(`[DEV] Simulating usage limit with ${options.testMode}s wait time`);
+        } else {
+          limitStatus = await claudeCli.checkUsageLimit();
+        }
+
         if (limitStatus.hasLimit && limitStatus.resumeTimestamp) {
           logger.info('Usage limit detected, waiting...');
-          // TODO: Implement waiting logic
+          
+          // Calculate wait time with buffer
+          const currentTime = Math.floor(Date.now() / 1000);
+          const waitSeconds = Math.max(0, limitStatus.resumeTimestamp - currentTime + config.waitBuffer);
+          
+          if (waitSeconds > 0) {
+            // Countdown with progress indication
+            await TimeUtils.waitWithCountdown(waitSeconds);
+          }
         }
 
         // Resume Claude session or execute custom command
@@ -242,7 +200,12 @@ TROUBLESHOOTING:
           logger.info('Executing custom command after usage limit wait period');
           await CommandExecutor.executeWithSafeguards(options.execute);
         } else {
-          await claudeCli.resume(finalPrompt, options.continue || false, config.skipPermissions);
+          const output = await claudeCli.resume(finalPrompt, options.continue || false, config.skipPermissions);
+          // Display Claude output like shell script
+          if (output && output.trim()) {
+            console.log('CLAUDE_OUTPUT:');
+            console.log(output);
+          }
         }
       } catch (error) {
         logger.error('Failed to execute command:', { error });

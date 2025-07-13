@@ -2,7 +2,7 @@
  * Claude CLI interaction utilities
  */
 
-import { spawn } from 'child_process';
+import { spawn, exec, execSync } from 'child_process';
 import { ClaudeAutoResumeError } from '../utils/errors';
 import { createSpinner, withSpinner } from '../utils/progress';
 
@@ -29,76 +29,76 @@ export class ClaudeCLI {
   /**
    * Executes a Claude CLI command with timeout protection and optional progress indication
    * @param args - Command line arguments
-   * @param timeoutMs - Timeout in milliseconds (default: 30000)
+   * @param timeoutMs - Timeout in milliseconds (default: 60000)
    * @param showProgress - Whether to show progress spinner (default: true for operations >2s)
    */
-  async executeClaudeCommand(args: string[], timeoutMs = 30000, showProgress = timeoutMs >= 2000 && process.env.NODE_ENV !== 'test'): Promise<string> {
+  async executeClaudeCommand(args: string[], timeoutMs = 180000, showProgress = timeoutMs >= 2000 && process.env.NODE_ENV !== 'test'): Promise<string> {
+    // Log proxy settings for debugging (only for check command)
+    const isCheckCommand = args.includes('check');
+    const proxyVars = {
+      http_proxy: process.env.http_proxy,
+      https_proxy: process.env.https_proxy,
+    };
+    
+    if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
+      console.debug(`[DEBUG] Proxy settings: ${JSON.stringify(proxyVars)}`);
+      console.debug(`[DEBUG] Executing: ${this.cliPath} ${args.join(' ')}`);
+    }
+
     const operation = () => new Promise<string>((resolve, reject) => {
-      const child = spawn(this.cliPath, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: timeoutMs,
+      // Build the command string with proper shell escaping
+      const quotedArgs = args.map(arg => {
+        // Use JSON.stringify for proper shell escaping
+        return JSON.stringify(arg);
       });
+      
+      const command = `${this.cliPath} ${quotedArgs.join(' ')}`;
+      
+      if (process.env.NODE_ENV !== 'test' && isCheckCommand) {
+        console.debug(`[DEBUG] Executing with shell: ${command}`);
+        console.debug(`[DEBUG] Working directory: ${process.cwd()}`);
+      }
 
-      let stdout = '';
-      let stderr = '';
-
-      child.stdout?.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      child.stderr?.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve(stdout);
-        } else {
+      try {
+        // Use execSync for maximum compatibility with command line execution
+        const result = execSync(command, {
+          encoding: 'utf8',
+          timeout: timeoutMs,
+          env: process.env, // Use complete environment as-is
+          cwd: process.cwd(),
+          shell: process.env.SHELL || '/bin/bash', // Explicitly use shell
+          stdio: ['inherit', 'pipe', 'pipe'], // Inherit stdin, pipe stdout/stderr
+        });
+        
+        resolve(result);
+      } catch (error: any) {
+        if (error.status === null) {
+          // Timeout or signal
           reject(
             new ClaudeAutoResumeError(
-              `Claude CLI execution failed with exit code ${code}`,
+              `Claude CLI command timed out after ${timeoutMs}ms`,
               1,
-              `Command: ${this.cliPath} ${args.join(' ')}\nStderr: ${stderr}`
+              `Command: ${command}`
             )
           );
-        }
-      });
-
-      child.on('error', (error) => {
-        if (error.message.includes('ENOENT')) {
+        } else if (error.code === 'ENOENT') {
           reject(
             new ClaudeAutoResumeError(
               'Claude CLI not found in PATH',
               1,
-              `Make sure Claude CLI is installed and available in PATH. Command: ${this.cliPath}`
+              `Make sure Claude CLI is installed and available in PATH. Command: ${command}`
             )
           );
         } else {
           reject(
             new ClaudeAutoResumeError(
-              `Claude CLI execution error: ${error.message}`,
+              `Claude CLI execution failed with exit code ${error.status || 'unknown'}`,
               1,
-              `Command: ${this.cliPath} ${args.join(' ')}`
+              `Command: ${command}\\nStderr: ${error.stderr || ''}\\nError: ${error.message}`
             )
           );
         }
-      });
-
-      // Handle timeout
-      const timeoutHandle = setTimeout(() => {
-        child.kill('SIGTERM');
-        reject(
-          new ClaudeAutoResumeError(
-            `Claude CLI command timed out after ${timeoutMs}ms`,
-            1,
-            `Command: ${this.cliPath} ${args.join(' ')}`
-          )
-        );
-      }, timeoutMs);
-
-      child.on('close', () => {
-        clearTimeout(timeoutHandle);
-      });
+      }
     });
 
     if (showProgress) {
@@ -174,7 +174,7 @@ export class ClaudeCLI {
    */
   async checkUsageLimit(): Promise<UsageLimitResult> {
     try {
-      const output = await this.executeClaudeCommand(['-p', 'check']);
+      const output = await this.executeClaudeCommand(['--print', 'check']);
       return this.parseUsageLimitOutput(output);
     } catch (error) {
       if (error instanceof ClaudeAutoResumeError) {
@@ -202,6 +202,7 @@ export class ClaudeCLI {
       args.push('--dangerously-skip-permissions');
     }
 
+    // Add -p flag for print mode and prompt as positional argument
     args.push('-p', prompt);
     return args;
   }
@@ -209,11 +210,12 @@ export class ClaudeCLI {
   /**
    * Resumes a Claude session with the given prompt
    */
-  async resume(prompt: string, continueMode = false, skipPermissions = true): Promise<void> {
+  async resume(prompt: string, continueMode = false, skipPermissions = true): Promise<string> {
     const args = this.buildClaudeCommand(prompt, continueMode, skipPermissions);
 
     try {
-      await this.executeClaudeCommand(args);
+      const output = await this.executeClaudeCommand(args);
+      return output;
     } catch (error) {
       if (error instanceof ClaudeAutoResumeError) {
         throw error;
