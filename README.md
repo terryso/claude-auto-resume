@@ -3,9 +3,9 @@
 <div align="center">
 
 [![GitHub stars](https://img.shields.io/github/stars/terryso/claude-auto-resume.svg)](https://github.com/terryso/claude-auto-resume/stargazers)
-[![NPM Version](https://badge.fury.io/js/claude-auto-resume.svg)](https://www.npmjs.com/package/claude-auto-resume)
-[![NPM Downloads](https://img.shields.io/npm/dm/claude-auto-resume.svg)](https://www.npmjs.com/package/claude-auto-resume)
-[![Node Version](https://img.shields.io/node/v/claude-auto-resume?style=flat-square&color=brightgreen)](https://nodejs.org/)
+[![NPM Version](https://badge.fury.io/js/claude-resume.svg)](https://www.npmjs.com/package/claude-resume)
+[![NPM Downloads](https://img.shields.io/npm/dm/claude-resume.svg)](https://www.npmjs.com/package/claude-resume)
+[![Node Version](https://img.shields.io/node/v/claude-resume?style=flat-square&color=brightgreen)](https://nodejs.org/)
 
 [![GitHub License](https://img.shields.io/github/license/terryso/claude-auto-resume?style=flat-square)](https://github.com/terryso/claude-auto-resume/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/actions/workflow/status/terryso/claude-auto-resume/release.yml?style=flat-square&label=Release)](https://github.com/terryso/claude-auto-resume/actions/workflows/release.yml)
@@ -83,10 +83,10 @@ This script is particularly useful when using Claude Code for development in the
 
 ```bash
 # Global installation
-npm install -g claude-auto-resume
+npm install -g claude-resume
 
 # Use without installing (via npx)
-npx claude-auto-resume "your prompt here"
+npx claude-resume "your prompt here"
 
 # Verify installation
 claude-auto-resume --version
@@ -102,7 +102,7 @@ If you're upgrading from the shell script version:
 sudo make uninstall
 
 # 2. Install new TypeScript version
-npm install -g claude-auto-resume
+npm install -g claude-resume
 
 # 3. Verify migration - all commands work identically
 claude-auto-resume "test migration"

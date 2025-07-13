@@ -101,7 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🚀 Features
 - **TypeScript Migration**: Complete rewrite from shell script to TypeScript
-- **NPM Distribution**: Available via `npm install -g claude-auto-resume` and `npx claude-auto-resume`
+- **NPM Distribution**: Available via `npm install -g claude-resume` and `npx claude-resume`
 - **Enhanced User Experience**: Better error messages, progress indicators, and logging
 - **Configuration Support**: Optional configuration files and enhanced environment variables
 - **Debug Mode**: Comprehensive system diagnostics with `--debug` flag
@@ -124,7 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🔄 Migration from Shell Script
 - **100% Backward Compatibility**: All shell script commands work identically
 - **Enhanced Features**: Better logging, configuration, and debugging
-- **Easy Migration**: `npm install -g claude-auto-resume` replaces shell installation
+- **Easy Migration**: `npm install -g claude-resume` replaces shell installation
 - **No Workflow Changes**: Existing usage patterns remain the same
 
 ### 📦 Distribution
