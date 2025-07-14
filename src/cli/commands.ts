@@ -119,50 +119,66 @@ function displaySessionInfo(options: CLIOptions, finalPrompt: string): void {
 }
 
 /**
- * Get version from package.json
+ * Tries to find version from package.json files
  */
-function getVersion(): string {
-  try {
-    // Try multiple possible paths for package.json
-    const possiblePaths = [
-      join(__dirname, '..', '..', 'package.json'),
-      join(process.cwd(), 'package.json'),
-      join(__dirname, 'package.json'),
-      join(__dirname, '..', 'package.json'),
-    ];
+function getVersionFromPackageJson(): string | null {
+  const possiblePaths = [
+    join(__dirname, '..', '..', 'package.json'),
+    join(process.cwd(), 'package.json'),
+    join(__dirname, 'package.json'),
+    join(__dirname, '..', 'package.json'),
+  ];
 
-    for (const packagePath of possiblePaths) {
-      try {
-        const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
-        if (packageJson.version) {
-          return packageJson.version;
-        }
-      } catch {
-        // Try next path
-        continue;
-      }
-    }
-
-    throw new Error('No package.json found in any expected location');
-  } catch {
-    // Fallback to reading from npm environment if available
+  for (const packagePath of possiblePaths) {
     try {
-      const { execSync } = require('child_process');
-      const npmVersion = execSync('npm list claude-auto-resume --depth=0 --json 2>/dev/null', {
-        encoding: 'utf8',
-        cwd: process.cwd(),
-      });
-      const npmData = JSON.parse(npmVersion);
-      const version = npmData?.dependencies?.['claude-auto-resume']?.version;
-      if (version) {
-        return version;
+      const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
+      if (packageJson.version) {
+        return packageJson.version;
       }
     } catch {
-      // Ignore npm lookup errors
+      // Try next path
+      continue;
     }
-
-    return '2.0.1'; // Fallback version
   }
+
+  return null;
+}
+
+/**
+ * Tries to get version from npm environment
+ */
+function getVersionFromNpm(): string | null {
+  try {
+    const { execSync } = require('child_process');
+    const npmVersion = execSync('npm list claude-auto-resume --depth=0 --json 2>/dev/null', {
+      encoding: 'utf8',
+      cwd: process.cwd(),
+    });
+    const npmData = JSON.parse(npmVersion);
+    return npmData?.dependencies?.['claude-auto-resume']?.version || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get version using multiple fallback strategies
+ */
+function getVersion(): string {
+  // Strategy 1: Try package.json files
+  const packageVersion = getVersionFromPackageJson();
+  if (packageVersion) {
+    return packageVersion;
+  }
+
+  // Strategy 2: Try npm environment
+  const npmVersion = getVersionFromNpm();
+  if (npmVersion) {
+    return npmVersion;
+  }
+
+  // Strategy 3: Fallback version
+  return '2.0.1';
 }
 
 /**
@@ -273,20 +289,18 @@ function configureLogging(options: CLIOptions): void {
 }
 
 /**
- * Shows system check information
+ * Checks Node.js and platform information
  */
-async function showSystemCheck(): Promise<void> {
-  logger.info('System Check Information:');
-  logger.info('========================');
-
-  // Check Node.js version
+function checkNodeJsPlatform(): void {
   logger.info(`Node.js Version: ${process.version}`);
-
-  // Check platform
   logger.info(`Platform: ${process.platform}`);
   logger.info(`Architecture: ${process.arch}`);
+}
 
-  // Check Claude CLI
+/**
+ * Checks Claude CLI availability and features
+ */
+async function checkClaudeCLI(): Promise<void> {
   try {
     const { execSync } = require('child_process');
     const claudeVersion = execSync('claude --version', { encoding: 'utf8', timeout: 5000 }).trim();
@@ -309,23 +323,112 @@ async function showSystemCheck(): Promise<void> {
   } catch (error) {
     logger.error(`Claude CLI: Not available or error occurred - ${error}`);
   }
+}
 
-  // Check environment variables
+/**
+ * Checks environment variables
+ */
+function checkEnvironmentVariables(): void {
   logger.info('Environment Variables:');
-  logger.info(
-    `  CLAUDE_AUTO_RESUME_WAIT_BUFFER: ${process.env.CLAUDE_AUTO_RESUME_WAIT_BUFFER || 'Not set'}`
-  );
-  logger.info(
-    `  CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS: ${process.env.CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS || 'Not set'}`
-  );
-  logger.info(
-    `  CLAUDE_AUTO_RESUME_LOG_FILE: ${process.env.CLAUDE_AUTO_RESUME_LOG_FILE || 'Not set'}`
-  );
+  const envVars = [
+    'CLAUDE_AUTO_RESUME_WAIT_BUFFER',
+    'CLAUDE_AUTO_RESUME_SKIP_PERMISSIONS', 
+    'CLAUDE_AUTO_RESUME_LOG_FILE'
+  ];
 
-  // Show current logging configuration
+  envVars.forEach(envVar => {
+    logger.info(`  ${envVar}: ${process.env[envVar] || 'Not set'}`);
+  });
+}
+
+/**
+ * Shows logging configuration
+ */
+function showLoggingConfiguration(): void {
   logger.info('Logging Configuration:');
   logger.info(`  Log Level: ${LogLevel[logger.getLevel()]}`);
   logger.info(`  File Output: ${logger.getLogFile() || 'Console only'}`);
+}
+
+/**
+ * Shows comprehensive system check information
+ */
+async function showSystemCheck(): Promise<void> {
+  logger.info('System Check Information:');
+  logger.info('========================');
+
+  checkNodeJsPlatform();
+  await checkClaudeCLI();
+  checkEnvironmentVariables();
+  showLoggingConfiguration();
+}
+
+/**
+ * Collects comprehensive system and configuration information
+ */
+async function collectDebugInformation(
+  options: CLIOptions,
+  config: CLIConfig
+): Promise<{ systemInfo: any; configInfo: any }> {
+  // Enable debug mode in DebugUtils
+  DebugUtils.enableDebugMode();
+
+  // Collect comprehensive system information
+  const systemInfo = await DebugUtils.withDebugTracking('collect-system-info', async () => {
+    return await DebugUtils.collectSystemInfo();
+  });
+
+  // Collect configuration debug info
+  const configInfo = DebugUtils.collectConfigDebugInfo(
+    options,
+    process.env as Record<string, string>,
+    undefined, // config file path - would need to be passed from config loader
+    config,
+    config
+  );
+
+  return { systemInfo, configInfo };
+}
+
+/**
+ * Analyzes and logs prompt information
+ */
+function analyzePrompt(prompt: string): void {
+  logger.debug('=== PROMPT ANALYSIS ===');
+  const promptValidation = validatePromptWithFeedback(prompt);
+  logger.debug('Prompt Validation:', promptValidation);
+
+  logger.debug('Prompt Details:', {
+    length: prompt.length,
+    trimmedLength: prompt.trim().length,
+    hasSpecialChars: /[<>"|&;`$(){}[\]\\]/.test(prompt),
+    wordCount: prompt.trim().split(/\s+/).length,
+    lines: prompt.split('\n').length,
+  });
+}
+
+/**
+ * Shows performance metrics and Claude CLI analysis
+ */
+function showDebugAnalysis(systemInfo: any, config: CLIConfig): void {
+  // Performance metrics
+  logger.debug('=== PERFORMANCE METRICS ===');
+  const performanceMetrics = DebugUtils.getPerformanceMetrics();
+  logger.debug('Current Performance:', performanceMetrics);
+
+  // Claude CLI analysis
+  logger.debug('=== CLAUDE CLI ANALYSIS ===');
+  logger.debug('Claude CLI Info:', {
+    available: systemInfo.claude.available,
+    version: systemInfo.claude.version,
+    path: config.claudeCliPath,
+    error: systemInfo.claude.error,
+  });
+
+  // Offer to export debug information
+  logger.debug('=== DEBUG EXPORT ===');
+  logger.info('Debug information collected successfully');
+  logger.info('To export full debug info to file, use: claude-auto-resume --debug --export');
 }
 
 /**
@@ -337,58 +440,19 @@ async function showDebugDiagnostics(
   prompt: string
 ): Promise<void> {
   try {
-    // Enable debug mode in DebugUtils
-    DebugUtils.enableDebugMode();
-
-    // Collect comprehensive system information
-    const systemInfo = await DebugUtils.withDebugTracking('collect-system-info', async () => {
-      return await DebugUtils.collectSystemInfo();
-    });
-
-    // Collect configuration debug info
-    const configInfo = DebugUtils.collectConfigDebugInfo(
-      options,
-      process.env as Record<string, string>,
-      undefined, // config file path - would need to be passed from config loader
-      config,
-      config
-    );
+    // Collect debug information
+    const { systemInfo, configInfo } = await collectDebugInformation(options, config);
 
     // Format and display comprehensive debug output
     const debugOutput = DebugUtils.formatDebugOutput(systemInfo, configInfo);
     console.log(debugOutput);
 
-    // Additional prompt analysis
-    logger.debug('=== PROMPT ANALYSIS ===');
-    const promptValidation = validatePromptWithFeedback(prompt);
-    logger.debug('Prompt Validation:', promptValidation);
+    // Analyze prompt
+    analyzePrompt(prompt);
 
-    logger.debug('Prompt Details:', {
-      length: prompt.length,
-      trimmedLength: prompt.trim().length,
-      hasSpecialChars: /[<>"|&;`$(){}[\]\\]/.test(prompt),
-      wordCount: prompt.trim().split(/\s+/).length,
-      lines: prompt.split('\n').length,
-    });
+    // Show additional analysis
+    showDebugAnalysis(systemInfo, config);
 
-    // Performance metrics
-    logger.debug('=== PERFORMANCE METRICS ===');
-    const performanceMetrics = DebugUtils.getPerformanceMetrics();
-    logger.debug('Current Performance:', performanceMetrics);
-
-    // Claude CLI analysis
-    logger.debug('=== CLAUDE CLI ANALYSIS ===');
-    logger.debug('Claude CLI Info:', {
-      available: systemInfo.claude.available,
-      version: systemInfo.claude.version,
-      path: config.claudeCliPath,
-      error: systemInfo.claude.error,
-    });
-
-    // Offer to export debug information
-    logger.debug('=== DEBUG EXPORT ===');
-    logger.info('Debug information collected successfully');
-    logger.info('To export full debug info to file, use: claude-auto-resume --debug --export');
   } catch (error) {
     logger.error('Debug diagnostics failed:', {
       error: error instanceof Error ? error.message : String(error),
