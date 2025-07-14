@@ -19,6 +19,106 @@ import { DebugUtils } from '../utils/debug';
 import type { CLIConfig } from '../config/types';
 
 /**
+ * Validation result interface
+ */
+interface ValidationResult {
+  isValid: boolean;
+  finalPrompt?: string;
+  errors?: string[];
+}
+
+/**
+ * Validates CLI options and arguments
+ */
+function validateCLIArguments(
+  promptArg: string | undefined,
+  options: CLIOptions,
+  config: CLIConfig
+): ValidationResult {
+  const errors: string[] = [];
+
+  // Handle --cmd alias for --execute
+  if (options.cmd && !options.execute) {
+    options.execute = options.cmd;
+  }
+
+  // Validate argument combinations
+  if (options.execute && options.continue) {
+    errors.push('Cannot use both custom command execution (-e/--execute/--cmd) and continue flag (-c/--continue).');
+    errors.push('These options are mutually exclusive.');
+    errors.push("Use 'claude-auto-resume --help' to see usage examples.");
+    return { isValid: false, errors };
+  }
+
+  // Enhanced command validation
+  if (options.execute) {
+    const commandValidation = validateCommandWithFeedback(options.execute);
+    if (!commandValidation.valid) {
+      errors.push(`Invalid command: ${commandValidation.error}`);
+      if (commandValidation.suggestion) {
+        errors.push(`Suggestion: ${commandValidation.suggestion}`);
+      }
+      return { isValid: false, errors };
+    }
+    if (commandValidation.warnings) {
+      commandValidation.warnings.forEach((warning) => {
+        logger.warn(`Command warning: ${warning}`);
+      });
+    }
+  }
+
+  // Enhanced test mode validation
+  if (typeof options.testMode === 'number') {
+    const timeoutValidation = validateTimeoutWithFeedback(options.testMode);
+    if (!timeoutValidation.valid) {
+      errors.push(`Invalid test mode value: ${timeoutValidation.error}`);
+      if (timeoutValidation.suggestion) {
+        errors.push(`Suggestion: ${timeoutValidation.suggestion}`);
+      }
+      return { isValid: false, errors };
+    }
+    if (timeoutValidation.suggestion) {
+      logger.warn(`Test mode suggestion: ${timeoutValidation.suggestion}`);
+    }
+  }
+
+  // Use positional argument if provided, otherwise use flag or default
+  const finalPrompt = promptArg || options.prompt || config.defaultPrompt;
+
+  // Enhanced prompt validation
+  const promptValidation = validatePromptWithFeedback(finalPrompt);
+  if (!promptValidation.valid) {
+    errors.push(`Invalid prompt: ${promptValidation.error}`);
+    if (promptValidation.suggestion) {
+      errors.push(`Suggestion: ${promptValidation.suggestion}`);
+    }
+    return { isValid: false, errors };
+  }
+  if (promptValidation.suggestion) {
+    logger.warn(`Prompt suggestion: ${promptValidation.suggestion}`);
+  }
+
+  return { isValid: true, finalPrompt };
+}
+
+/**
+ * Displays session information at startup
+ */
+function displaySessionInfo(options: CLIOptions, finalPrompt: string): void {
+  logger.info('Claude Auto Resume - TypeScript Version');
+  logger.info(`Prompt: ${finalPrompt}`);
+  logger.info(`Continue mode: ${options.continue ? 'enabled' : 'disabled'}`);
+
+  if (options.execute) {
+    logger.info(`Custom command to execute: ${options.execute}`);
+  }
+
+  if (options.testMode) {
+    logger.info(`[DEV] Test mode enabled - simulating ${options.testMode}s wait`);
+  }
+}
+
+/**
  * Get version from package.json
  */
 function getVersion(): string {
@@ -105,171 +205,35 @@ Examples:
     )
     .action(async (promptArg: string | undefined, options: CLIOptions) => {
       try {
-        // Handle --cmd alias for --execute
-        if (options.cmd && !options.execute) {
-          options.execute = options.cmd;
-        }
-
-        // Configure logging based on verbosity options
+        // Configure logging first
         configureLogging(options);
 
-        // Validate argument combinations
-        if (options.execute && options.continue) {
-          logger.error(
-            'Cannot use both custom command execution (-e/--execute/--cmd) and continue flag (-c/--continue).'
-          );
-          logger.error('These options are mutually exclusive.');
-          logger.error("Use 'claude-auto-resume --help' to see usage examples.");
-          process.exit(1);
-        }
-
-        // Enhanced command validation
-        if (options.execute) {
-          const commandValidation = validateCommandWithFeedback(options.execute);
-          if (!commandValidation.valid) {
-            logger.error(`Invalid command: ${commandValidation.error}`);
-            if (commandValidation.suggestion) {
-              logger.error(`Suggestion: ${commandValidation.suggestion}`);
-            }
-            process.exit(1);
-          }
-          if (commandValidation.warnings) {
-            commandValidation.warnings.forEach((warning) => {
-              logger.warn(`Command warning: ${warning}`);
-            });
-          }
-        }
-
-        // Enhanced test mode validation
-        if (typeof options.testMode === 'number') {
-          const timeoutValidation = validateTimeoutWithFeedback(options.testMode);
-          if (!timeoutValidation.valid) {
-            logger.error(`Invalid test mode value: ${timeoutValidation.error}`);
-            if (timeoutValidation.suggestion) {
-              logger.error(`Suggestion: ${timeoutValidation.suggestion}`);
-            }
-            process.exit(1);
-          }
-          if (timeoutValidation.suggestion) {
-            logger.warn(`Test mode suggestion: ${timeoutValidation.suggestion}`);
-          }
-        }
-
-        // Handle system check
+        // Handle special commands early
         if (options.check) {
           await showSystemCheck();
           return;
         }
 
-        // Use positional argument if provided, otherwise use flag or default
-        const finalPrompt = promptArg || options.prompt || config.defaultPrompt;
-
-        // Enhanced prompt validation
-        const promptValidation = validatePromptWithFeedback(finalPrompt);
-        if (!promptValidation.valid) {
-          logger.error(`Invalid prompt: ${promptValidation.error}`);
-          if (promptValidation.suggestion) {
-            logger.error(`Suggestion: ${promptValidation.suggestion}`);
-          }
+        // Validate all CLI arguments and options
+        const validation = validateCLIArguments(promptArg, options, config);
+        if (!validation.isValid) {
+          validation.errors?.forEach(error => logger.error(error));
           process.exit(1);
         }
-        if (promptValidation.suggestion) {
-          logger.warn(`Prompt suggestion: ${promptValidation.suggestion}`);
-        }
 
-        logger.info('Claude Auto Resume - TypeScript Version');
-        logger.info(`Prompt: ${finalPrompt}`);
-        logger.info(`Continue mode: ${options.continue ? 'enabled' : 'disabled'}`);
+        const finalPrompt = validation.finalPrompt!;
 
-        if (options.execute) {
-          logger.info(`Custom command to execute: ${options.execute}`);
-        }
+        // Display session information
+        displaySessionInfo(options, finalPrompt);
 
-        if (options.testMode) {
-          logger.info(`[DEV] Test mode enabled - simulating ${options.testMode}s wait`);
-        }
-
-        // Debug mode diagnostics
+        // Show debug diagnostics if requested
         if (options.debug) {
           await showDebugDiagnostics(options, config, finalPrompt);
         }
 
-        // Initialize Claude CLI
-        const claudeCli = new ClaudeCLI(config.claudeCliPath);
+        // Execute the main logic
+        await executeClaudeAutoResume(options, config, finalPrompt);
 
-        // Check for usage limits and handle accordingly
-        let limitStatus;
-        if (options.testMode) {
-          // Simulate usage limit for test mode
-          const currentTime = Math.floor(Date.now() / 1000);
-          limitStatus = {
-            hasLimit: true,
-            resumeTimestamp: currentTime + options.testMode,
-            rawOutput: `Claude AI usage limit reached|${currentTime + options.testMode}`,
-            waitSeconds: options.testMode,
-          };
-          logger.info(`[DEV] Simulating usage limit with ${options.testMode}s wait time`);
-        } else {
-          limitStatus = await claudeCli.checkUsageLimit();
-        }
-
-        if (limitStatus.hasLimit && limitStatus.resumeTimestamp) {
-          logger.info('Usage limit detected, waiting...');
-
-          // Calculate wait time with buffer
-          const currentTime = Math.floor(Date.now() / 1000);
-          const waitSeconds = Math.max(
-            0,
-            limitStatus.resumeTimestamp - currentTime + config.waitBuffer
-          );
-
-          if (waitSeconds > 0) {
-            // Countdown with progress indication
-            await TimeUtils.waitWithCountdown(waitSeconds);
-          }
-
-          // Re-check network connectivity before resuming (skip in execute mode)
-          if (!options.execute) {
-            logger.info('Re-checking network connectivity before resuming...');
-            try {
-              const { NetworkUtils } = await import('../core/network');
-              const isConnected = await NetworkUtils.checkConnectivity();
-              if (!isConnected) {
-                logger.error('Network connectivity lost during wait period.');
-                logger.error('Please check your internet connection and run the script again.');
-                process.exit(3);
-              }
-            } catch (error) {
-              logger.warn('Network connectivity check failed, but continuing...', { error });
-            }
-          }
-
-          // Resume Claude session or execute custom command after wait
-          if (options.execute) {
-            logger.info('Executing custom command after usage limit wait period');
-            await CommandExecutor.executeWithSafeguards(options.execute);
-          } else {
-            const output = await claudeCli.resume(
-              finalPrompt,
-              options.continue || false,
-              config.skipPermissions
-            );
-            // Display Claude output like shell script
-            if (output && output.trim()) {
-              console.log('CLAUDE_OUTPUT:');
-              console.log(output);
-            }
-          }
-        } else {
-          // No usage limit detected - match shell script behavior
-          if (options.execute) {
-            logger.info('No usage limit detected. Custom command will only execute after a usage limit wait period.');
-            logger.info('Since there is no usage limit, the custom command will not be executed.');
-            logger.info('Use claude-auto-resume in execute mode only when you expect usage limits.');
-          } else {
-            logger.info('No waiting required. Task completed.');
-          }
-        }
       } catch (error) {
         logger.error('Failed to execute command:', { error });
         process.exit(1);
@@ -430,5 +394,115 @@ async function showDebugDiagnostics(
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;
+  }
+}
+
+/**
+ * Executes the core logic for handling usage limits and resuming tasks
+ */
+async function executeClaudeAutoResume(
+  options: CLIOptions,
+  config: CLIConfig,
+  finalPrompt: string
+): Promise<void> {
+  // Initialize Claude CLI
+  const claudeCli = new ClaudeCLI(config.claudeCliPath);
+
+  // Check for usage limits and handle accordingly
+  let limitStatus;
+  if (options.testMode) {
+    // Simulate usage limit for test mode
+    const currentTime = Math.floor(Date.now() / 1000);
+    limitStatus = {
+      hasLimit: true,
+      resumeTimestamp: currentTime + options.testMode,
+      rawOutput: `Claude AI usage limit reached|${currentTime + options.testMode}`,
+      waitSeconds: options.testMode,
+    };
+    logger.info(`[DEV] Simulating usage limit with ${options.testMode}s wait time`);
+  } else {
+    limitStatus = await claudeCli.checkUsageLimit();
+  }
+
+  if (limitStatus.hasLimit && limitStatus.resumeTimestamp) {
+    await handleUsageLimitDetected(options, config, finalPrompt, limitStatus, claudeCli);
+  } else {
+    handleNoUsageLimit(options);
+  }
+}
+
+/**
+ * Handles the case when usage limit is detected
+ */
+async function handleUsageLimitDetected(
+  options: CLIOptions,
+  config: CLIConfig,
+  finalPrompt: string,
+  limitStatus: any,
+  claudeCli: ClaudeCLI
+): Promise<void> {
+  logger.info('Usage limit detected, waiting...');
+
+  // Calculate wait time with buffer
+  const currentTime = Math.floor(Date.now() / 1000);
+  const waitSeconds = Math.max(
+    0,
+    limitStatus.resumeTimestamp - currentTime + config.waitBuffer
+  );
+
+  if (waitSeconds > 0) {
+    // Countdown with progress indication
+    await TimeUtils.waitWithCountdown(waitSeconds);
+  }
+
+  // Re-check network connectivity before resuming (skip in execute mode)
+  if (!options.execute) {
+    logger.info('Re-checking network connectivity before resuming...');
+    try {
+      const { NetworkUtils } = await import('../core/network');
+      const isConnected = await NetworkUtils.checkConnectivity();
+      if (!isConnected) {
+        logger.error('Network connectivity lost during wait period.');
+        logger.error('Please check your internet connection and run the script again.');
+        process.exit(3);
+      }
+    } catch (error) {
+      logger.warn('Network connectivity check failed, but continuing...', { error });
+    }
+  }
+
+  // Resume Claude session or execute custom command after wait
+  if (options.execute) {
+    logger.info('Executing custom command after usage limit wait period');
+    await CommandExecutor.executeWithSafeguards(options.execute);
+  } else {
+    const output = await claudeCli.resume(
+      finalPrompt,
+      options.continue || false,
+      config.skipPermissions
+    );
+    // Display Claude output like shell script
+    if (output && output.trim()) {
+      console.log('CLAUDE_OUTPUT:');
+      console.log(output);
+    }
+  }
+}
+
+/**
+ * Handles the case when no usage limit is detected
+ */
+function handleNoUsageLimit(options: CLIOptions): void {
+  // No usage limit detected - match shell script behavior
+  if (options.execute) {
+    logger.info(
+      'No usage limit detected. Custom command will only execute after a usage limit wait period.'
+    );
+    logger.info('Since there is no usage limit, the custom command will not be executed.');
+    logger.info(
+      'Use claude-auto-resume in execute mode only when you expect usage limits.'
+    );
+  } else {
+    logger.info('No waiting required. Task completed.');
   }
 }

@@ -111,10 +111,7 @@ describe('ClaudeCLI with execSync', () => {
 
       await claudeCli.executeClaudeCommand(['-p', 'test with spaces']);
 
-      expect(mockExecSync).toHaveBeenCalledWith(
-        'claude -p "test with spaces"',
-        expect.any(Object)
-      );
+      expect(mockExecSync).toHaveBeenCalledWith('claude -p "test with spaces"', expect.any(Object));
     });
 
     it('should include proper environment and options', async () => {
