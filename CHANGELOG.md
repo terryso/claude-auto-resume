@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [2.0.19] - 2025-07-14
+
+- Refactor command-executor.ts for better single responsibility adherence
+- Refactor claude-cli.ts for better single responsibility adherence
+- Complete CLI commands refactoring for better code organization
+- Refactor CLI commands for better separation of concerns
+
+### Notes
+- See commit history for detailed changes
+- Maintains 100% backward compatibility
+
+
 ## [2.0.18] - 2025-07-14
 
 ### Changed
