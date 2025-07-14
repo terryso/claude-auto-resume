@@ -263,7 +263,7 @@ The TypeScript migration is complete with superior npm-based distribution that r
 #### NPM Distribution Benefits
 
 - **Cross-platform**: Single package works on Linux, macOS, and Windows
-- **Easy Installation**: `npm install -g claude-resume` or `npx claude-auto-resume`
+- **Easy Installation**: `npm install -g claude-auto-resume` or `npx claude-auto-resume`
 - **Automatic Updates**: Standard npm upgrade workflows
 - **No Platform Dependencies**: Node.js handles cross-platform compatibility
 - **Ecosystem Integration**: Follows Node.js ecosystem best practices
@@ -272,7 +272,7 @@ The TypeScript migration is complete with superior npm-based distribution that r
 
 ```bash
 # Global installation (replaces make install)
-npm install -g claude-resume
+npm install -g claude-auto-resume
 claude-auto-resume "continue"
 
 # Direct usage without installation (better than download/execute)
@@ -286,7 +286,7 @@ npm run build && node dist/cli.js
 
 Users can seamlessly migrate from shell script:
 
-1. **Install via npm**: `npm install -g claude-resume`
+1. **Install via npm**: `npm install -g claude-auto-resume`
 2. **Same command patterns**: All CLI arguments work identically
 3. **Enhanced features**: Better error messages, logging, configuration support
 4. **Backward compatibility**: 100% shell script feature parity maintained
