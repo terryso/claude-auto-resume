@@ -19,6 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [2.0.17] - 2025-07-14
+
+- Change package name back to claude-auto-resume
+
+### Notes
+- See commit history for detailed changes
+- Maintains 100% backward compatibility
+
+
 ## [2.0.16] - 2025-07-13
 
 - Improve CHANGELOG.md with accurate version descriptions
