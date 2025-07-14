@@ -54,18 +54,9 @@ export class CommandExecutor {
   }
 
   /**
-   * Executes a custom command with comprehensive logging and error handling
+   * Logs execution start information
    */
-  static async executeCustomCommand(
-    command: string,
-    showWarning = true,
-    timeout: number = CommandExecutor.MAX_EXECUTION_TIME_MS
-  ): Promise<CommandExecutionResult> {
-    // Show security warning if enabled
-    if (showWarning) {
-      await CommandExecutor.showSecurityWarning(command);
-    }
-
+  private static logExecutionStart(command: string, timeout: number): number {
     const startTime = Date.now();
     const startTimestamp = Math.floor(startTime / 1000);
     const timeDisplay = TimeUtils.getTimeDisplay(startTimestamp);
@@ -80,82 +71,186 @@ export class CommandExecutor {
       console.log('[INFO] Maximum execution time: Unlimited (like shell script)');
     }
 
-    return new Promise((resolve) => {
-      // Use shell to support complex commands with pipes and redirections
-      const spawnOptions: any = {
-        stdio: ['pipe', 'pipe', 'pipe'],
-      };
+    return startTime;
+  }
 
-      // Only set timeout if it's greater than 0 (unlimited execution like shell script)
-      if (timeout > 0) {
-        spawnOptions.timeout = timeout;
+  /**
+   * Creates spawn options for command execution
+   */
+  private static createSpawnOptions(timeout: number): any {
+    const spawnOptions: any = {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    };
+
+    // Only set timeout if it's greater than 0 (unlimited execution like shell script)
+    if (timeout > 0) {
+      spawnOptions.timeout = timeout;
+    }
+
+    return spawnOptions;
+  }
+
+  /**
+   * Sets up output stream handlers for real-time output
+   */
+  private static setupOutputHandlers(child: any): { stdout: string; stderr: string } {
+    let stdout = '';
+    let stderr = '';
+
+    // Collect stdout
+    child.stdout?.on('data', (data: any) => {
+      const chunk = data.toString();
+      stdout += chunk;
+      // Real-time output for user feedback
+      process.stdout.write(chunk);
+    });
+
+    // Collect stderr
+    child.stderr?.on('data', (data: any) => {
+      const chunk = data.toString();
+      stderr += chunk;
+      // Real-time error output
+      process.stderr.write(chunk);
+    });
+
+    return { stdout, stderr };
+  }
+
+  /**
+   * Logs execution completion information
+   */
+  private static logExecutionEnd(
+    executionTime: number,
+    exitCode: number,
+    timedOut: boolean
+  ): void {
+    const endTime = Date.now();
+    const endTimestamp = Math.floor(endTime / 1000);
+    const endTimeDisplay = TimeUtils.getTimeDisplay(endTimestamp);
+    const durationFormatted = TimeUtils.formatDuration(Math.floor(executionTime / 1000));
+    const durationShort = TimeUtils.formatDurationShort(Math.floor(executionTime / 1000));
+
+    console.log(`\n[INFO] Command completed`);
+    console.log(`[INFO] Exit code: ${exitCode}`);
+    console.log(`[INFO] Execution time: ${durationFormatted} (${durationShort})`);
+    console.log(`[INFO] End time: ${endTimeDisplay.absolute} (${endTimeDisplay.relative})`);
+
+    if (timedOut) {
+      console.log('[WARNING] Command was terminated due to timeout');
+    }
+  }
+
+  /**
+   * Logs execution result summary
+   */
+  private static logExecutionSummary(result: CommandExecutionResult): void {
+    if (result.success) {
+      console.log('[SUCCESS] Command executed successfully');
+    } else {
+      console.log(`[ERROR] Command failed with exit code ${result.exitCode}`);
+      if (result.stderr.trim()) {
+        console.log(`[ERROR] Error output: ${result.stderr.trim()}`);
       }
+    }
+  }
 
+  /**
+   * Sets up timeout handler for process termination
+   */
+  private static setupTimeoutHandler(
+    child: any,
+    timeout: number,
+    timedOutRef: { value: boolean }
+  ): NodeJS.Timeout | undefined {
+    if (timeout <= 0) {
+      return undefined;
+    }
+
+    const timeoutHandle = setTimeout(() => {
+      timedOutRef.value = true;
+      child.kill('SIGTERM');
+
+      console.log(
+        `\n[WARNING] Command execution timed out after ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`
+      );
+      console.log('[INFO] Sending SIGTERM to process...');
+
+      // Force kill after additional 5 seconds
+      setTimeout(() => {
+        child.kill('SIGKILL');
+        console.log('[WARNING] Force killing process (SIGKILL)');
+      }, 5000);
+    }, timeout);
+
+    // Clean up timeout when process ends
+    child.on('close', () => {
+      clearTimeout(timeoutHandle);
+    });
+
+    return timeoutHandle;
+  }
+
+  /**
+   * Sets up interrupt handler for Ctrl+C
+   */
+  private static setupInterruptHandler(child: any, timeoutHandle?: NodeJS.Timeout): void {
+    const handleInterrupt = () => {
+      console.log('\n[INFO] User interrupt received. Terminating command...');
+      child.kill('SIGINT');
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+    };
+
+    process.on('SIGINT', handleInterrupt);
+    child.on('close', () => {
+      process.removeListener('SIGINT', handleInterrupt);
+    });
+  }
+
+  /**
+   * Executes a custom command with comprehensive logging and error handling
+   */
+  static async executeCustomCommand(
+    command: string,
+    showWarning = true,
+    timeout: number = CommandExecutor.MAX_EXECUTION_TIME_MS
+  ): Promise<CommandExecutionResult> {
+    // Show security warning if enabled
+    if (showWarning) {
+      await CommandExecutor.showSecurityWarning(command);
+    }
+
+    const startTime = CommandExecutor.logExecutionStart(command, timeout);
+
+    return new Promise((resolve) => {
+      const spawnOptions = CommandExecutor.createSpawnOptions(timeout);
       const child = spawn('sh', ['-c', command], spawnOptions);
 
-      let stdout = '';
-      let stderr = '';
-      let timedOut = false;
-
-      // Collect stdout
-      child.stdout?.on('data', (data) => {
-        const chunk = data.toString();
-        stdout += chunk;
-        // Real-time output for user feedback
-        process.stdout.write(chunk);
-      });
-
-      // Collect stderr
-      child.stderr?.on('data', (data) => {
-        const chunk = data.toString();
-        stderr += chunk;
-        // Real-time error output
-        process.stderr.write(chunk);
-      });
+      const outputStreams = CommandExecutor.setupOutputHandlers(child);
+      const timedOutRef = { value: false };
 
       // Handle process completion
       child.on('close', (code) => {
         const executionTime = Date.now() - startTime;
         const exitCode = code || 0;
 
-        const endTime = Date.now();
-        const endTimestamp = Math.floor(endTime / 1000);
-        const endTimeDisplay = TimeUtils.getTimeDisplay(endTimestamp);
-        const durationFormatted = TimeUtils.formatDuration(Math.floor(executionTime / 1000));
-        const durationShort = TimeUtils.formatDurationShort(Math.floor(executionTime / 1000));
-
-        console.log(`\n[INFO] Command completed`);
-        console.log(`[INFO] Exit code: ${exitCode}`);
-        console.log(`[INFO] Execution time: ${durationFormatted} (${durationShort})`);
-        console.log(`[INFO] End time: ${endTimeDisplay.absolute} (${endTimeDisplay.relative})`);
-
-        if (timedOut) {
-          console.log('[WARNING] Command was terminated due to timeout');
-        }
+        CommandExecutor.logExecutionEnd(executionTime, exitCode, timedOutRef.value);
 
         const result: CommandExecutionResult = {
           exitCode,
-          stdout,
-          stderr,
+          stdout: outputStreams.stdout,
+          stderr: outputStreams.stderr,
           executionTime,
-          success: exitCode === 0 && !timedOut,
+          success: exitCode === 0 && !timedOutRef.value,
         };
 
-        // Log execution summary
-        if (result.success) {
-          console.log('[SUCCESS] Command executed successfully');
-        } else {
-          console.log(`[ERROR] Command failed with exit code ${exitCode}`);
-          if (stderr.trim()) {
-            console.log(`[ERROR] Error output: ${stderr.trim()}`);
-          }
-        }
-
+        CommandExecutor.logExecutionSummary(result);
         resolve(result);
       });
 
       // Handle process errors
-      child.on('error', (error) => {
+      child.on('error', (error: Error) => {
         const executionTime = Date.now() - startTime;
         const durationFormatted = TimeUtils.formatDuration(Math.floor(executionTime / 1000));
         const durationShort = TimeUtils.formatDurationShort(Math.floor(executionTime / 1000));
@@ -165,60 +260,23 @@ export class CommandExecutor {
 
         resolve({
           exitCode: 1,
-          stdout,
+          stdout: outputStreams.stdout,
           stderr: error.message,
           executionTime,
           success: false,
         });
       });
 
-      // Timeout handler - only set up if timeout > 0
-      let timeoutHandle: NodeJS.Timeout | undefined;
-      if (timeout > 0) {
-        timeoutHandle = setTimeout(() => {
-          timedOut = true;
-          child.kill('SIGTERM');
-
-          console.log(
-            `\n[WARNING] Command execution timed out after ${TimeUtils.formatDuration(Math.floor(timeout / 1000))}`
-          );
-          console.log('[INFO] Sending SIGTERM to process...');
-
-          // Force kill after additional 5 seconds
-          setTimeout(() => {
-            child.kill('SIGKILL');
-            console.log('[WARNING] Force killing process (SIGKILL)');
-          }, 5000);
-        }, timeout);
-
-        // Clean up timeout when process ends
-        child.on('close', () => {
-          if (timeoutHandle) {
-            clearTimeout(timeoutHandle);
-          }
-        });
-      }
-
-      // Handle user interruption (Ctrl+C)
-      const handleInterrupt = () => {
-        console.log('\n[INFO] User interrupt received. Terminating command...');
-        child.kill('SIGINT');
-        if (timeoutHandle) {
-          clearTimeout(timeoutHandle);
-        }
-      };
-
-      process.on('SIGINT', handleInterrupt);
-      child.on('close', () => {
-        process.removeListener('SIGINT', handleInterrupt);
-      });
+      // Set up timeout and interrupt handlers
+      const timeoutHandle = CommandExecutor.setupTimeoutHandler(child, timeout, timedOutRef);
+      CommandExecutor.setupInterruptHandler(child, timeoutHandle);
     });
   }
 
   /**
-   * Validates a command before execution
+   * Validates basic command format
    */
-  static validateCommand(command: string): { valid: boolean; error?: string } {
+  private static validateCommandFormat(command: string): { valid: boolean; error?: string } {
     if (!command || typeof command !== 'string') {
       return { valid: false, error: 'Command must be a non-empty string' };
     }
@@ -228,6 +286,13 @@ export class CommandExecutor {
       return { valid: false, error: 'Command cannot be empty or whitespace only' };
     }
 
+    return { valid: true };
+  }
+
+  /**
+   * Checks for dangerous command patterns
+   */
+  private static checkDangerousPatterns(command: string): { valid: boolean; error?: string } {
     // Basic security checks - warn about potentially dangerous commands
     const dangerousPatterns = [
       /rm\s+-rf\s+\//, // rm -rf /
@@ -237,12 +302,31 @@ export class CommandExecutor {
     ];
 
     for (const pattern of dangerousPatterns) {
-      if (pattern.test(trimmedCommand)) {
+      if (pattern.test(command)) {
         return {
           valid: false,
           error: `Command contains potentially dangerous pattern: ${pattern.source}. Please review carefully.`,
         };
       }
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Validates a command before execution
+   */
+  static validateCommand(command: string): { valid: boolean; error?: string } {
+    // Validate basic format
+    const formatValidation = CommandExecutor.validateCommandFormat(command);
+    if (!formatValidation.valid) {
+      return formatValidation;
+    }
+
+    // Check for dangerous patterns
+    const dangerousValidation = CommandExecutor.checkDangerousPatterns(command.trim());
+    if (!dangerousValidation.valid) {
+      return dangerousValidation;
     }
 
     return { valid: true };
