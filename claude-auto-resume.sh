@@ -4,7 +4,7 @@
 # Depends only on standard shell commands and claude CLI
 
 # Version information
-VERSION="1.3.0"
+VERSION="1.3.1"
 
 # Default prompt to use when resuming
 DEFAULT_PROMPT="continue"
@@ -46,6 +46,7 @@ interrupt_handler() {
 
 # Global flag to prevent double cleanup
 CLEANUP_DONE=false
+
 
 # Cleanup resources and temporary state
 cleanup_resources() {
@@ -369,11 +370,12 @@ echo "Network connectivity confirmed."
 # 1. Run the claude CLI command with timeout protection (unless in execute mode)
 if [ "$EXECUTE_MODE" = true ]; then
     echo "Execute mode detected. Checking for usage limits..."
+    echo "[INFO] This check may take 1-2 minutes depending on network conditions..."
     # In execute mode, we still need to check Claude usage limits
     # but skip if Claude CLI is not available
     if command -v claude &> /dev/null; then
         CLAUDE_PID=""
-        CLAUDE_OUTPUT=$(timeout 30s claude -p 'check' 2>&1)
+        CLAUDE_OUTPUT=$(timeout 300s claude -p 'check' 2>&1)
         RET_CODE=$?
         CLAUDE_PID=""
     else
@@ -383,8 +385,9 @@ if [ "$EXECUTE_MODE" = true ]; then
     fi
 else
     echo "Executing Claude CLI command..."
+    echo "[INFO] This check may take 1-2 minutes depending on network conditions..."
     CLAUDE_PID=""
-    CLAUDE_OUTPUT=$(timeout 30s claude -p 'check' 2>&1)
+    CLAUDE_OUTPUT=$(timeout 300s claude -p 'check' 2>&1)
     RET_CODE=$?
     CLAUDE_PID=""
 fi
@@ -392,13 +395,13 @@ fi
 # Check for timeout scenario (exit code 124 from timeout command)
 if [ $RET_CODE -eq 124 ]; then
     if [ "$EXECUTE_MODE" = true ]; then
-        echo "[WARNING] Claude CLI operation timed out after 30 seconds in execute mode."
+        echo "[WARNING] Claude CLI operation timed out after 300 seconds in execute mode."
         echo "[HINT] Will proceed with custom command execution without usage limit detection."
     else
-        echo "[ERROR] Claude CLI operation timed out after 30 seconds."
+        echo "[ERROR] Claude CLI operation timed out after 300 seconds."
         echo "[HINT] This may indicate network issues or Claude service problems."
         echo "[SUGGESTION] Try again in a few minutes, or check Claude service status."
-        echo "[DEBUG] Command executed: timeout 30s claude -p 'check'"
+        echo "[DEBUG] Command executed: timeout 300s claude -p 'check'"
         exit 3
     fi
 fi
