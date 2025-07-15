@@ -6,6 +6,8 @@ English | [中文](README.zh.md)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/F1F11HO935)
 
+[中文文档](README_zh.md)
+
 ## ⚠️ SECURITY WARNING
 
 **This script uses `--dangerously-skip-permissions` flag when executing Claude commands and can execute arbitrary shell commands**, which means:
@@ -44,7 +46,13 @@ This script is particularly useful when using Claude Code for development in the
 
 ## Installation
 
-### Method 1: Using Makefile (Recommended)
+### method 1: using wget (Recommended)
+
+```bash
+wget -qO- https://raw.githubusercontent.com/terryso/claude-auto-resume/refs/heads/develop/claude-auto-resume.sh  | sudo tee /usr/local/bin/claude-auto-resume >/dev/null && sudo chmod +x /usr/local/bin/claude-auto-resume
+```
+
+### method 2: using Makefile
 
 ```bash
 # Global installation
@@ -57,7 +65,7 @@ sudo make install PREFIX=/opt/local
 sudo make uninstall
 ```
 
-### Method 2: Manual Installation
+### method 3: Manual Installation
 
 ```bash
 # Copy to system path
@@ -68,7 +76,7 @@ sudo chmod +x /usr/local/bin/claude-auto-resume
 sudo ln -s $(pwd)/claude-auto-resume.sh /usr/local/bin/claude-auto-resume
 ```
 
-### Method 3: Direct Usage (No Installation)
+### method 4: Direct Usage (No Installation)
 
 ```bash
 # Make script executable
