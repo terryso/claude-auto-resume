@@ -47,3 +47,5 @@ claude-auto-resume.log
 .gemini/
 .bmad-core/
 .claude/ 
+dist/
+coverage/
