@@ -4,7 +4,7 @@
 # Depends only on standard shell commands and claude CLI
 
 # Version information
-VERSION="1.4.1"
+VERSION="1.5.0"
 
 # Default prompt to use when resuming
 DEFAULT_PROMPT="continue"
@@ -16,6 +16,7 @@ CUSTOM_COMMAND=""
 # Test mode for simulating usage limits
 TEST_MODE=false
 TEST_WAIT_SECONDS=0
+TEST_MESSAGE_TYPE="old"  # "old" for timestamp format, "new" for time format
 
 # Cleanup function for graceful termination
 cleanup_on_exit() {
@@ -132,87 +133,108 @@ execute_custom_command() {
     return $exit_code
 }
 
-# Function to extract timestamp from old format: Claude AI usage limit reached|<timestamp>
-extract_old_format_timestamp() {
+# Unified function to parse limit message and return resume timestamp
+parse_limit_message() {
     local claude_output="$1"
     local resume_timestamp
     
-    resume_timestamp=$(echo "$claude_output" | awk -F'|' '{print $2}')
-    if ! [[ "$resume_timestamp" =~ ^[0-9]+$ ]] || [ "$resume_timestamp" -le 0 ]; then
-        echo "[ERROR] Failed to extract a valid resume timestamp from Claude output."
-        echo "[HINT] Expected format: 'Claude AI usage limit reached|<timestamp>'"
-        echo "[SUGGESTION] Check if Claude CLI output format has changed."
-        echo "[DEBUG] Raw output: $claude_output"
-        echo "[DEBUG] Extracted timestamp: '$resume_timestamp'"
-        exit 2
-    fi
-    
-    echo "$resume_timestamp"
-}
-
-# Function to extract timestamp from new format: X-hour limit reached ∙ resets Xam/pm
-extract_new_format_timestamp() {
-    local claude_output="$1"
-    local reset_time reset_hour reset_period reset_hour_24
-    local now_timestamp today_reset resume_timestamp
-    
-    # Extract the reset time (e.g., "3am")
-    reset_time=$(echo "$claude_output" | grep -o "resets [0-9]*[ap]m" | awk '{print $2}')
-    if [ -z "$reset_time" ]; then
-        echo "[ERROR] Failed to extract reset time from new Claude output format."
-        echo "[HINT] Expected format: 'X-hour limit reached ∙ resets Xam/pm'"
-        echo "[SUGGESTION] Check if Claude CLI output format has changed."
-        echo "[DEBUG] Raw output: $claude_output"
-        exit 2
-    fi
-    
-    # Convert reset time to timestamp
-    # Extract hour and am/pm
-    reset_hour=$(echo "$reset_time" | sed 's/[ap]m//')
-    reset_period=$(echo "$reset_time" | grep -o '[ap]m')
-    
-    # Convert to 24-hour format
-    if [ "$reset_period" = "am" ]; then
-        if [ "$reset_hour" = "12" ]; then
-            reset_hour_24=0
-        else
-            reset_hour_24=$reset_hour
+    # Check for old format: Claude AI usage limit reached|<timestamp>
+    if echo "$claude_output" | grep -q "Claude AI usage limit reached|"; then
+        resume_timestamp=$(echo "$claude_output" | awk -F'|' '{print $2}')
+        if ! [[ "$resume_timestamp" =~ ^[0-9]+$ ]] || [ "$resume_timestamp" -le 0 ]; then
+            echo "[ERROR] Failed to extract a valid resume timestamp from Claude output."
+            echo "[HINT] Expected format: 'Claude AI usage limit reached|<timestamp>'"
+            echo "[SUGGESTION] Check if Claude CLI output format has changed."
+            echo "[DEBUG] Raw output: $claude_output"
+            echo "[DEBUG] Extracted timestamp: '$resume_timestamp'"
+            exit 2
         fi
-    else
-        if [ "$reset_hour" = "12" ]; then
-            reset_hour_24=12
-        else
-            reset_hour_24=$((reset_hour + 12))
+        echo "$resume_timestamp"
+        return
+    fi
+    
+    # Check for new format: X-hour limit reached ∙ resets Xam/pm or X:XXam/pm
+    if echo "$claude_output" | grep -q "limit reached.*resets"; then
+        local reset_time reset_hour reset_minute reset_period reset_hour_24
+        local now_timestamp today_reset
+        
+        # Extract the reset time (e.g., "3am", "12:30am")
+        reset_time=$(echo "$claude_output" | grep -o "resets [0-9]*:*[0-9]*[ap]m" | awk '{print $2}')
+        if [ -z "$reset_time" ]; then
+            echo "[ERROR] Failed to extract reset time from new Claude output format."
+            echo "[HINT] Expected format: 'X-hour limit reached ∙ resets Xam/pm' or 'X-hour limit reached ∙ resets X:XXam/pm'"
+            echo "[SUGGESTION] Check if Claude CLI output format has changed."
+            echo "[DEBUG] Raw output: $claude_output"
+            exit 2
         fi
-    fi
-    
-    # Get current time and calculate next reset time
-    now_timestamp=$(date +%s)
-    
-    # Get today's reset time
-    if date --version >/dev/null 2>&1; then
-        # GNU date (Linux)
-        today_reset=$(date -d "today ${reset_hour_24}:00:00" +%s)
-    else
-        # BSD date (macOS)
-        today_reset=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date +%Y-%m-%d) ${reset_hour_24}:00:00" +%s)
-    fi
-    
-    # If reset time has passed today, use tomorrow's reset time
-    if [ $now_timestamp -gt $today_reset ]; then
+        
+        # Convert reset time to timestamp
+        # Extract hour, minute (if present), and am/pm
+        reset_period=$(echo "$reset_time" | grep -o '[ap]m')
+        
+        # Check if time includes minutes (e.g., "12:30am")
+        if echo "$reset_time" | grep -q ":"; then
+            reset_hour=$(echo "$reset_time" | cut -d: -f1)
+            reset_minute=$(echo "$reset_time" | sed 's/[ap]m//' | cut -d: -f2)
+        else
+            # Only hour specified (e.g., "3am")
+            reset_hour=$(echo "$reset_time" | sed 's/[ap]m//')
+            reset_minute=0
+        fi
+        
+        # Convert to 24-hour format
+        if [ "$reset_period" = "am" ]; then
+            if [ "$reset_hour" = "12" ]; then
+                reset_hour_24=0
+            else
+                reset_hour_24=$reset_hour
+            fi
+        else
+            if [ "$reset_hour" = "12" ]; then
+                reset_hour_24=12
+            else
+                reset_hour_24=$((reset_hour + 12))
+            fi
+        fi
+        
+        # Get current time and calculate next reset time
+        now_timestamp=$(date +%s)
+        
+        # Get today's reset time
         if date --version >/dev/null 2>&1; then
             # GNU date (Linux)
-            resume_timestamp=$(date -d "tomorrow ${reset_hour_24}:00:00" +%s)
+            today_reset=$(date -d "today ${reset_hour_24}:${reset_minute}:00" +%s)
         else
             # BSD date (macOS)
-            local tomorrow=$(date -j -v+1d +%Y-%m-%d)
-            resume_timestamp=$(date -j -f "%Y-%m-%d %H:%M:%S" "${tomorrow} ${reset_hour_24}:00:00" +%s)
+            today_reset=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date +%Y-%m-%d) ${reset_hour_24}:${reset_minute}:00" +%s)
         fi
-    else
-        resume_timestamp=$today_reset
+        
+        # If reset time has passed today, use tomorrow's reset time
+        if [ $now_timestamp -gt $today_reset ]; then
+            if date --version >/dev/null 2>&1; then
+                # GNU date (Linux)
+                resume_timestamp=$(date -d "tomorrow ${reset_hour_24}:${reset_minute}:00" +%s)
+            else
+                # BSD date (macOS)
+                local tomorrow=$(date -j -v+1d +%Y-%m-%d)
+                resume_timestamp=$(date -j -f "%Y-%m-%d %H:%M:%S" "${tomorrow} ${reset_hour_24}:${reset_minute}:00" +%s)
+            fi
+        else
+            resume_timestamp=$today_reset
+        fi
+        
+        echo "$resume_timestamp"
+        return
     fi
     
-    echo "$resume_timestamp"
+    # If no recognized format found
+    echo "[ERROR] Unrecognized Claude usage limit message format."
+    echo "[HINT] Expected formats:"
+    echo "  - 'Claude AI usage limit reached|<timestamp>'"
+    echo "  - 'X-hour limit reached ∙ resets Xam/pm'"
+    echo "[SUGGESTION] Check if Claude CLI output format has changed."
+    echo "[DEBUG] Raw output: $claude_output"
+    exit 2
 }
 
 # Function to check network connectivity
@@ -280,6 +302,7 @@ OPTIONS:
     -v, --version        Show version information
     --check              Show system check information
     --test-mode SECONDS   [DEV] Simulate usage limit with specified wait time in seconds
+    --test-new-format     [DEV] Use with --test-mode to simulate new format messages
 
 EXAMPLES:
     claude-auto-resume "implement feature"
@@ -288,6 +311,7 @@ EXAMPLES:
     claude-auto-resume -e "npm run dev"     # Executes after usage limit wait
     claude-auto-resume --cmd "python app.py"  # Executes after usage limit wait
     claude-auto-resume --test-mode 10 -e "echo test"  # [DEV] Test with 10s wait
+    claude-auto-resume --test-mode 5 --test-new-format "continue"  # [DEV] Test new format
 
 ⚠️  Uses --dangerously-skip-permissions. Use only in trusted environments.
 ⚠️  Custom command execution allows arbitrary shell commands. Use with caution.
@@ -343,6 +367,10 @@ while [[ $# -gt 0 ]]; do
             TEST_MODE=true
             TEST_WAIT_SECONDS="$2"
             shift 2
+            ;;
+        --test-new-format)
+            TEST_MESSAGE_TYPE="new"
+            shift
             ;;
         --check)
             # Display comprehensive system check information
@@ -507,7 +535,29 @@ LIMIT_MSG=$(echo "$CLAUDE_OUTPUT" | grep -E "(hit your limit.*resets)")
 # Test mode: simulate usage limit
 if [ "$TEST_MODE" = true ]; then
   echo "[TEST MODE] Simulating usage limit with ${TEST_WAIT_SECONDS} seconds wait time..."
-  LIMIT_MSG="Claude AI usage limit reached|simulated"
+  if [ "$TEST_MESSAGE_TYPE" = "new" ]; then
+    # Calculate future time for new format simulation
+    future_timestamp=$(($(date +%s) + TEST_WAIT_SECONDS))
+    if date --version >/dev/null 2>&1; then
+      # GNU date (Linux)
+      future_time=$(date -d "@$future_timestamp" "+%-I:%M%p" | tr '[:upper:]' '[:lower:]')
+    else
+      # BSD date (macOS) - handle the format conversion
+      future_hour=$(date -r $future_timestamp "+%I")
+      future_minute=$(date -r $future_timestamp "+%M")
+      future_period=$(date -r $future_timestamp "+%p" | tr '[:upper:]' '[:lower:]')
+      # Remove leading zero from hour
+      future_hour=$(echo $future_hour | sed 's/^0//')
+      future_time="${future_hour}:${future_minute}${future_period}"
+    fi
+    CLAUDE_OUTPUT="5-hour limit reached ∙ resets ${future_time}"
+    LIMIT_MSG="$CLAUDE_OUTPUT"
+  else
+    # Old format with simulated timestamp
+    future_timestamp=$(($(date +%s) + TEST_WAIT_SECONDS))
+    CLAUDE_OUTPUT="Claude AI usage limit reached|${future_timestamp}"
+    LIMIT_MSG="$CLAUDE_OUTPUT"
+  fi
 fi
 
 if [ -n "$LIMIT_MSG" ]; then
@@ -518,16 +568,8 @@ if [ -n "$LIMIT_MSG" ]; then
     RESUME_TIMESTAMP=$((NOW_TIMESTAMP + TEST_WAIT_SECONDS))
     WAIT_SECONDS=$TEST_WAIT_SECONDS
   else
-    # Normal mode: extract timestamp from Claude output
-    # Check if it's the old format with timestamp
-    if echo "$CLAUDE_OUTPUT" | grep -q "Claude AI usage limit reached|"; then
-      # Old format: Claude AI usage limit reached|<timestamp>
-      RESUME_TIMESTAMP=$(extract_old_format_timestamp "$CLAUDE_OUTPUT")
-    else
-      # New format: X-hour limit reached ∙ resets Xam/pm
-      RESUME_TIMESTAMP=$(extract_new_format_timestamp "$CLAUDE_OUTPUT")
-    fi
-    
+    # Normal mode: extract timestamp from Claude output using unified parser
+    RESUME_TIMESTAMP=$(parse_limit_message "$CLAUDE_OUTPUT")
     NOW_TIMESTAMP=$(date +%s)
     WAIT_SECONDS=$((RESUME_TIMESTAMP - NOW_TIMESTAMP))
   fi
