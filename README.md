@@ -45,10 +45,12 @@ This script is particularly useful when using Claude Code for development in the
 - 🛡️ Security warnings with cancellation options
 - 🔗 Support for complex commands (pipes, redirections, operators)
 - 🧪 Built-in test mode for development and validation
-- 🖥️ Cross-platform support (Linux/macOS)
+- 🖥️ Cross-platform support (Linux/macOS/Windows PowerShell)
 - 📦 Zero external dependencies (only standard Unix tools required)
 
 ## Installation
+
+Linux/macOS installation steps are identical to the original upstream repository and are kept unchanged below.
 
 ### method 1: using wget (Recommended)
 
@@ -90,7 +92,30 @@ chmod +x claude-auto-resume.sh
 ./claude-auto-resume.sh
 ```
 
+### Windows (PowerShell)
+
+These Windows steps are specific to this fork. Linux/macOS users should use the methods above.
+
+```powershell
+# From the repo root
+$dest = Join-Path $env:USERPROFILE "bin"
+New-Item -ItemType Directory -Force -Path $dest | Out-Null
+Copy-Item .\claude-auto-resume.ps1, .\claude-auto-resume.cmd $dest
+```
+
+Ensure the destination folder is on your user PATH, then run:
+
+```powershell
+claude-auto-resume --help
+```
+
+Notes:
+- The `.cmd` wrapper lets you run `claude-auto-resume` directly from PowerShell or CMD.
+- The wrapper uses `pwsh` if available, otherwise falls back to Windows PowerShell.
+
 ## Usage
+
+Windows uses the same command-line options and flags as Linux/macOS.
 
 ### Basic Usage
 
@@ -201,6 +226,7 @@ claude-auto-resume --test-mode 10 --cmd "npm run test"       # Test build proces
 
 - **Claude CLI**: Must be installed and available in PATH
 - **Standard Unix Tools**: `grep`, `date`, `sleep`, `awk` (usually pre-installed)
+- **Windows**: PowerShell 5.1+ or PowerShell 7+ (when using the Windows script)
 
 ## Security Considerations
 
@@ -242,6 +268,8 @@ bash -n claude-auto-resume.sh
 ```
 claude-auto-resume/
 ├── claude-auto-resume.sh    # Main script
+├── claude-auto-resume.ps1   # Windows PowerShell script
+├── claude-auto-resume.cmd   # Windows wrapper
 ├── Makefile                 # Installation/uninstallation script
 ├── docs/                    # Project documentation
 │   ├── architecture.md      # Architecture documentation
@@ -273,6 +301,11 @@ Before contributing new features, please check our [roadmap](docs/ROADMAP.md) to
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
+
+## Credits
+
+- Original project and Bash implementation by terryso: https://github.com/terryso/claude-auto-resume
+- Windows PowerShell port and Windows installation notes added in this fork
 
 ## Support
 
