@@ -1,0 +1,808 @@
+#!/usr/bin/env python3
+"""claude-auto-resume: Run Claude CLI in a loop with auto-resume on rate limits."""
+
+import argparse
+import atexit
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+
+VERSION = "2.2.0"
+SESSION_DIR = Path(".claude-auto-resume")
+STATUS_FILE = SESSION_DIR / "status.json"
+LOG_FILE = SESSION_DIR / "session.log"
+STOP_FILE = SESSION_DIR / "stop"
+MAX_RUNS = 100
+SETTINGS_FILE = Path.home() / ".claude" / "settings.json"
+HEARTBEAT_INTERVAL = 300  # Log heartbeat every 5 minutes
+SUBPROCESS_TIMEOUT = 3600  # Kill subprocess if no output for 1 hour
+
+
+def restore_terminal():
+    """Restore terminal to sane state. Safe to call multiple times."""
+    try:
+        subprocess.run(["stty", "sane"], check=False,
+                     stdin=sys.stdin, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, timeout=1)
+    except Exception:
+        pass
+
+
+# Register terminal restoration to run on exit
+atexit.register(restore_terminal)
+
+
+def write_status(state, prompt, run_number=0):
+    """Write session status to JSON file."""
+    SESSION_DIR.mkdir(exist_ok=True)
+    branch = "n/a"
+    try:
+        branch = subprocess.check_output(
+            ["git", "branch", "--show-current"], stderr=subprocess.DEVNULL, text=True
+        ).strip()
+    except Exception:
+        pass
+
+    status = {
+        "state": state,
+        "pid": os.getpid(),
+        "prompt": prompt,
+        "run": run_number,
+        "started": datetime.now().isoformat(),
+        "updated": datetime.now().isoformat(),
+        "cwd": os.getcwd(),
+        "branch": branch,
+        "log": str(LOG_FILE),
+    }
+
+    # Preserve original start time if status file exists
+    if STATUS_FILE.exists():
+        try:
+            old = json.loads(STATUS_FILE.read_text())
+            status["started"] = old.get("started", status["started"])
+        except Exception:
+            pass
+
+    STATUS_FILE.write_text(json.dumps(status, indent=2) + "\n")
+
+
+def read_status():
+    """Read session status from JSON file."""
+    if not STATUS_FILE.exists():
+        return None
+    try:
+        return json.loads(STATUS_FILE.read_text())
+    except Exception:
+        return None
+
+
+def get_model_from_settings():
+    """Read model from Claude settings file."""
+    if not SETTINGS_FILE.exists():
+        return None
+    try:
+        settings = json.loads(SETTINGS_FILE.read_text())
+        return settings.get("model")
+    except Exception:
+        return None
+
+
+def log(msg):
+    """Print and append to log file."""
+    print(msg, flush=True)
+    try:
+        with open(LOG_FILE, "a") as f:
+            f.write(msg + "\n")
+    except Exception:
+        pass
+
+
+def check_stop_requested():
+    """Check if user requested stop via --stop."""
+    if STOP_FILE.exists():
+        STOP_FILE.unlink()
+        return True
+    return False
+
+
+def check_rate_limit(output):
+    """Check if output contains a rate limit message. Returns reset info or None."""
+    patterns = [
+        r"hit your limit.*resets\s+(\d+)(am|pm)",
+        r"limit reached.*resets\s+(\d+)(am|pm)",
+        r"Claude AI usage limit reached\|(\d+)",
+    ]
+
+    for pattern in patterns:
+        m = re.search(pattern, output)
+        if m:
+            return m
+    return None
+
+
+def parse_rate_limit_time(match):
+    """Parse rate limit match into a target timestamp."""
+    groups = match.groups()
+
+    # Old format: raw unix timestamp
+    if len(groups) == 1:
+        try:
+            return int(groups[0])
+        except ValueError:
+            return None
+
+    # New format: "3am" / "3pm"
+    hour = int(groups[0])
+    period = groups[1]
+
+    if period == "am":
+        h24 = 0 if hour == 12 else hour
+    else:
+        h24 = 12 if hour == 12 else hour + 12
+
+    now = datetime.now()
+    reset = now.replace(hour=h24, minute=0, second=0, microsecond=0)
+    if reset <= now:
+        reset += timedelta(days=1)
+
+    return int(reset.timestamp())
+
+
+def wait_for_reset(resume_ts):
+    """Wait until the rate limit resets with a countdown."""
+    resume_dt = datetime.fromtimestamp(resume_ts)
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    target_str = resume_dt.strftime('%Y-%m-%d %H:%M:%S')
+
+    log("")
+    log("=" * 60)
+    log(f"[RATE LIMIT] Hit usage limit at {now_str}")
+    log(f"[RATE LIMIT] Will resume at {target_str}")
+    log(f"[RATE LIMIT] Waiting for {int((resume_ts - time.time()) / 3600)} hours {int(((resume_ts - time.time()) % 3600) / 60)} minutes")
+    log("=" * 60)
+    log("")
+
+    last_log_time = time.time()
+    check_in_interval = 300  # Log every 5 minutes
+
+    while True:
+        remaining = resume_ts - time.time()
+        if remaining <= 0:
+            break
+
+        # Periodic check-in logging
+        if time.time() - last_log_time >= check_in_interval:
+            h = int(remaining // 3600)
+            m = int((remaining % 3600) // 60)
+            now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            log(f"[CHECK-IN] Still waiting for rate limit reset. Time remaining: {h:02d}h {m:02d}m (Current: {now_str}, Target: {target_str})")
+            last_log_time = time.time()
+
+        h = int(remaining // 3600)
+        m = int((remaining % 3600) // 60)
+        s = int(remaining % 60)
+        print(f"\r[RATE LIMIT] Resuming in {h:02d}:{m:02d}:{s:02d}... (Target: {target_str})  ", end="", flush=True)
+        time.sleep(1)
+
+    print("\r" + " " * 80)  # Clear line
+    log("")
+    log(f"[RATE LIMIT] Reset time reached at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    log("[RATE LIMIT] Waiting 10 seconds before resuming...")
+    time.sleep(10)
+    log("[RATE LIMIT] Resuming now!")
+    log("")
+
+
+def run_claude(prompt, continue_flag=False):
+    """Run claude CLI and stream output live to terminal and log file with heartbeat monitoring."""
+    import threading
+    import queue
+
+    cmd = ["claude", "--dangerously-skip-permissions", "-p", prompt]
+    if continue_flag:
+        cmd.insert(1, "-c")
+
+    # Add model flag from settings
+    model = get_model_from_settings()
+    if model:
+        cmd.insert(1, model)
+        cmd.insert(1, "--model")
+        log(f"[RUN] Using model: {model}")
+
+    # Log the command with full prompt (not truncated)
+    log(f"[RUN] Starting Claude CLI at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    log(f"[RUN] Command: {' '.join(cmd[:3])}...")
+    log(f"[RUN] Prompt: {prompt}")
+    log("")
+
+    output_lines = []
+    last_output_time = [time.time()]  # Use list to allow modification in nested function
+    heartbeat_active = [True]
+
+    def heartbeat_logger():
+        """Log periodic heartbeats to show the process is alive."""
+        while heartbeat_active[0]:
+            time.sleep(HEARTBEAT_INTERVAL)
+            if heartbeat_active[0]:
+                elapsed = time.time() - last_output_time[0]
+                log(f"[HEARTBEAT] Claude CLI still running. Last output: {int(elapsed)}s ago ({datetime.now().strftime('%H:%M:%S')})")
+
+    try:
+        # Start heartbeat thread
+        heartbeat_thread = threading.Thread(target=heartbeat_logger, daemon=True)
+        heartbeat_thread.start()
+
+        # Use plain subprocess - no PTY/script to avoid terminal corruption
+        env = os.environ.copy()
+        env['PYTHONUNBUFFERED'] = '1'
+
+        log("[RUN] Launching subprocess...")
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=env,
+            bufsize=0,  # Unbuffered for immediate output
+            universal_newlines=False
+        )
+        log(f"[RUN] Subprocess launched with PID {proc.pid}")
+
+        with open(LOG_FILE, "a") as logf:
+            line_count = 0
+            for line in proc.stdout:
+                last_output_time[0] = time.time()
+                line_count += 1
+
+                decoded = line.decode("utf-8", errors="replace")
+                # Strip ANSI escape codes for the log
+                clean = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", decoded).replace("\r", "")
+
+                # Write to stdout and log
+                sys.stdout.write(decoded)
+                sys.stdout.flush()
+                logf.write(clean)
+                logf.flush()
+                output_lines.append(clean)
+
+                # Log progress every 100 lines
+                if line_count % 100 == 0:
+                    log(f"[RUN] Processed {line_count} lines of output...")
+
+        proc.wait()
+        return_code = proc.returncode
+
+        # Stop heartbeat
+        heartbeat_active[0] = False
+
+        log("")
+        log(f"[RUN] Claude CLI finished at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        log(f"[RUN] Exit code: {return_code}")
+        log(f"[RUN] Total output lines: {line_count}")
+        log("")
+
+        return return_code, "".join(output_lines)
+
+    except KeyboardInterrupt:
+        heartbeat_active[0] = False
+        log("[RUN] Interrupted by user")
+        try:
+            proc.kill()
+        except:
+            pass
+        raise
+    except Exception as e:
+        heartbeat_active[0] = False
+        log(f"[ERROR] Failed to run claude: {e}")
+        import traceback
+        log(f"[ERROR] Traceback: {traceback.format_exc()}")
+        return 1, str(e)
+
+
+def git_summary():
+    """Get a summary of git changes."""
+    def run_git(*args):
+        try:
+            return subprocess.check_output(
+                ["git"] + list(args), stderr=subprocess.DEVNULL, text=True
+            ).strip()
+        except Exception:
+            return ""
+
+    if not run_git("rev-parse", "--is-inside-work-tree"):
+        return ""
+
+    modified = len([f for f in run_git("diff", "--name-only").split("\n") if f])
+    staged = len([f for f in run_git("diff", "--cached", "--name-only").split("\n") if f])
+    untracked = len([f for f in run_git("ls-files", "--others", "--exclude-standard").split("\n") if f])
+
+    lines = [
+        "--- Git changes ---",
+        f"  Modified:  {modified} files",
+        f"  Staged:    {staged} files",
+        f"  Untracked: {untracked} new files",
+    ]
+
+    commits = run_git("log", "--oneline", "-10")
+    if commits:
+        lines.append("")
+        lines.append("  Recent commits:")
+        for c in commits.split("\n")[:10]:
+            lines.append(f"    {c}")
+
+    changed = run_git("diff", "--name-only")
+    new_files = run_git("ls-files", "--others", "--exclude-standard")
+    all_changed = sorted(set(f for f in (changed + "\n" + new_files).split("\n") if f))
+    if all_changed:
+        lines.append("")
+        lines.append("  Changed files:")
+        for f in all_changed:
+            lines.append(f"    {f}")
+
+    return "\n".join(lines)
+
+
+def log_run_summary(run_number, before_commit):
+    """Log a summary of what happened in this run."""
+    def run_git(*args):
+        try:
+            return subprocess.check_output(
+                ["git"] + list(args), stderr=subprocess.DEVNULL, text=True
+            ).strip()
+        except Exception:
+            return ""
+
+    if not run_git("rev-parse", "--is-inside-work-tree"):
+        return
+
+    # Get new commits since this run started
+    new_commits = run_git("log", f"{before_commit}..HEAD", "--oneline")
+    if new_commits:
+        log("")
+        log(f"[SUMMARY] Run #{run_number} - New commits:")
+        for commit in new_commits.split("\n"):
+            if commit:
+                log(f"  ✓ {commit}")
+
+    # Show what files were changed in these commits
+    if new_commits:
+        changed_files = run_git("diff", "--name-only", f"{before_commit}..HEAD")
+        if changed_files:
+            log(f"[SUMMARY] Files changed:")
+            for f in changed_files.split("\n"):
+                if f:
+                    log(f"    - {f}")
+
+
+def cmd_status(_args):
+    """Show status of running session."""
+    status = read_status()
+    if not status:
+        print("No active session found.")
+        print('  Start one with: ./claude-auto-resume "your prompt"')
+        return
+
+    pid = status.get("pid", 0)
+    running = False
+    try:
+        os.kill(pid, 0)
+        running = True
+    except (OSError, TypeError):
+        pass
+
+    # Elapsed time
+    elapsed = ""
+    try:
+        started = datetime.fromisoformat(status["started"])
+        delta = datetime.now() - started
+        h, remainder = divmod(int(delta.total_seconds()), 3600)
+        m, s = divmod(remainder, 60)
+        elapsed = f"{h}h {m}m {s}s"
+    except Exception:
+        pass
+
+    print("claude-auto-resume session status")
+    print("==================================")
+    print(f"  State:   {status.get('state', '?')}")
+    print(f"  Running: {'yes' if running else 'no'} (PID: {pid})")
+    print(f"  Run:     #{status.get('run', '?')}")
+    print(f"  Prompt:  {status.get('prompt', '?')}")
+    print(f"  Started: {status.get('started', '?')} ({elapsed} ago)")
+    print(f"  Updated: {status.get('updated', '?')}")
+    print(f"  CWD:     {status.get('cwd', '?')}")
+    print(f"  Branch:  {status.get('branch', 'n/a')}")
+    print(f"  Log:     {status.get('log', '?')}")
+
+    if LOG_FILE.exists():
+        lines = LOG_FILE.read_text().split("\n")
+        size_kb = LOG_FILE.stat().st_size / 1024
+        print(f"  Log:     {size_kb:.1f}KB ({len(lines)} lines)")
+
+    print()
+    print(git_summary())
+
+    if LOG_FILE.exists():
+        print()
+        print("--- Last 20 lines of output ---")
+        tail = lines[-20:]
+        for line in tail:
+            print(line)
+        print()
+        print(f"  Follow live: tail -f {LOG_FILE}")
+
+
+def cmd_stop(_args):
+    """Stop a running session gracefully."""
+    status = read_status()
+    if not status:
+        print("No active session found.")
+        return
+
+    pid = status.get("pid", 0)
+    running = False
+    try:
+        os.kill(pid, 0)
+        running = True
+    except (OSError, TypeError):
+        pass
+
+    if running:
+        SESSION_DIR.mkdir(exist_ok=True)
+        STOP_FILE.touch()
+        print(f"Stop signal sent to session (PID: {pid}).")
+        print(f"  Prompt: {status.get('prompt', '?')}")
+        print("  Session will stop after current Claude run finishes.")
+        print("  Use --status to confirm it stopped.")
+    else:
+        print(f"No running session to stop (PID {pid} is not active).")
+        status["state"] = "stopped"
+        STATUS_FILE.write_text(json.dumps(status, indent=2) + "\n")
+
+
+def cmd_force_stop(_args):
+    """Force stop a running session by killing all processes."""
+    status = read_status()
+    if not status:
+        print("No active session found.")
+        return
+
+    pid = status.get("pid", 0)
+    print(f"Force stopping session (PID: {pid})...")
+    print(f"  Prompt: {status.get('prompt', '?')[:80]}...")
+    print()
+
+    # Find and kill all child processes
+    killed_pids = []
+
+    try:
+        # Try using psutil if available (more reliable)
+        import psutil
+        try:
+            parent = psutil.Process(pid)
+            children = parent.children(recursive=True)
+
+            print(f"Found {len(children)} child process(es)")
+            for child in children:
+                try:
+                    print(f"  Killing child PID {child.pid} ({child.name()})...")
+                    child.kill()
+                    killed_pids.append(child.pid)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+
+            # Kill parent
+            print(f"  Killing parent PID {pid}...")
+            parent.kill()
+            killed_pids.append(pid)
+
+        except psutil.NoSuchProcess:
+            print(f"Process {pid} not found (already stopped?).")
+    except ImportError:
+        # Fallback: use pkill and kill commands
+        print("(psutil not available, using pkill fallback)")
+
+        # Kill all children
+        result = subprocess.run(
+            ["pkill", "-P", str(pid)],
+            capture_output=True
+        )
+
+        # Kill parent
+        try:
+            os.kill(pid, signal.SIGKILL)
+            killed_pids.append(pid)
+            print(f"  Killed PID {pid}")
+        except (OSError, ProcessLookupError):
+            print(f"  PID {pid} not found (already stopped?).")
+
+    # Also kill any rouge claude processes that might be hanging
+    print()
+    print("Checking for any hanging claude processes...")
+    result = subprocess.run(
+        ["pgrep", "-f", "claude.*--dangerously-skip-permissions"],
+        capture_output=True,
+        text=True
+    )
+
+    if result.stdout.strip():
+        hanging_pids = result.stdout.strip().split('\n')
+        print(f"Found {len(hanging_pids)} potentially hanging claude process(es)")
+        for hanging_pid in hanging_pids:
+            try:
+                hanging_pid = int(hanging_pid)
+                print(f"  Killing hanging claude PID {hanging_pid}...")
+                os.kill(hanging_pid, signal.SIGKILL)
+                killed_pids.append(hanging_pid)
+            except (ValueError, OSError, ProcessLookupError):
+                pass
+    else:
+        print("  No hanging claude processes found.")
+
+    # Update status
+    if status:
+        status["state"] = "force stopped"
+        status["updated"] = datetime.now().isoformat()
+        STATUS_FILE.write_text(json.dumps(status, indent=2) + "\n")
+
+    # Clean up stop file if it exists
+    STOP_FILE.unlink(missing_ok=True)
+
+    print()
+    if killed_pids:
+        print(f"✓ Force stopped {len(killed_pids)} process(es)")
+        print(f"  PIDs: {', '.join(map(str, killed_pids))}")
+    else:
+        print("No processes were running.")
+    print()
+    print("Session has been force stopped.")
+    print("You can start a new session with: ./claude-auto-resume \"your prompt\"")
+
+
+def cmd_run(args):
+    """Main run command - launches Claude in a loop."""
+    prompt = args.prompt or "continue"
+    continue_flag = args.continue_flag
+    foreground = args.fg
+
+    # Validate claude CLI exists
+    if not subprocess.run(["which", "claude"], capture_output=True).returncode == 0:
+        print("[ERROR] Claude CLI not found. Install it first.")
+        sys.exit(1)
+
+    # Network check
+    print("Checking network connectivity...")
+    try:
+        subprocess.check_call(
+            ["ping", "-c", "1", "-W", "3", "8.8.8.8"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except subprocess.CalledProcessError:
+        print("[ERROR] No network connectivity.")
+        sys.exit(3)
+    print("Network connectivity confirmed.")
+
+    # Background mode: re-exec with --fg and detach
+    if not foreground:
+        SESSION_DIR.mkdir(exist_ok=True)
+        STOP_FILE.unlink(missing_ok=True)
+
+        bg_args = [sys.executable, os.path.abspath(__file__), "--fg"]
+        if continue_flag:
+            bg_args.append("-c")
+        bg_args.append(prompt)
+
+        devnull = open(os.devnull, "w")
+        proc = subprocess.Popen(
+            bg_args,
+            stdout=devnull, stderr=devnull,
+            start_new_session=True,
+        )
+
+        branch = "n/a"
+        try:
+            branch = subprocess.check_output(
+                ["git", "branch", "--show-current"], stderr=subprocess.DEVNULL, text=True
+            ).strip()
+        except Exception:
+            pass
+
+        print(f"Session started in background (PID: {proc.pid})")
+        print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"  Prompt:  {prompt}")
+        print(f"  CWD:     {os.getcwd()}")
+        print(f"  Branch:  {branch}")
+        print(f"  Log:     {LOG_FILE}")
+        print()
+        print("Commands:")
+        print("  ./claude-auto-resume --status   # check progress")
+        print("  ./claude-auto-resume --stop     # stop gracefully")
+        print(f"  tail -f {LOG_FILE}  # follow live output")
+        return
+
+    # Foreground mode: run the loop
+    SESSION_DIR.mkdir(exist_ok=True)
+    STOP_FILE.unlink(missing_ok=True)
+    if LOG_FILE.exists():
+        LOG_FILE.write_text("")
+
+    current_prompt = prompt
+    current_continue = continue_flag
+    run_number = 0
+
+    write_status("running", prompt, 0)
+
+    # Get git branch
+    branch = "n/a"
+    try:
+        branch = subprocess.check_output(
+            ["git", "branch", "--show-current"], stderr=subprocess.DEVNULL, text=True
+        ).strip()
+    except Exception:
+        pass
+
+    log("=" * 60)
+    log(f"[SESSION] Claude Auto-Resume v{VERSION}")
+    log(f"[SESSION] Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    log(f"[SESSION] PID: {os.getpid()}")
+    log(f"[SESSION] CWD: {os.getcwd()}")
+    log(f"[SESSION] Branch: {branch}")
+    log(f"[SESSION] Model: {get_model_from_settings() or 'default'}")
+    log(f"[SESSION] Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
+    log(f"[SESSION] Max runs: {MAX_RUNS}")
+    log(f"[SESSION] Heartbeat interval: {HEARTBEAT_INTERVAL}s")
+    log("=" * 60)
+    log("")
+    log(f"[SESSION] Log file: {LOG_FILE}")
+    log(f"[SESSION] Stop gracefully: ./claude-auto-resume --stop")
+    log(f"[SESSION] Check status: ./claude-auto-resume --status")
+    log(f"[SESSION] Follow output: tail -f {LOG_FILE}")
+    log("")
+    log("[SESSION] Will keep running until stopped (Ctrl+C or --stop).")
+    log("")
+
+    def handle_signal(signum, frame):
+        log("")
+        log(f"[SESSION] Interrupted (signal {signum}). Cleaning up...")
+        write_status("interrupted", current_prompt, run_number)
+        # Kill child processes
+        try:
+            import psutil
+            parent = psutil.Process(os.getpid())
+            for child in parent.children(recursive=True):
+                child.kill()
+        except ImportError:
+            # No psutil, use pkill
+            subprocess.run(["pkill", "-P", str(os.getpid())], capture_output=True)
+        # Restore terminal state (atexit will also call this, but be explicit)
+        restore_terminal()
+        sys.exit(130)
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
+    while run_number < MAX_RUNS:
+        if check_stop_requested():
+            log(f"[SESSION] Stopped by user (via --stop) at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            log(f"[SESSION] Completed {run_number} run(s).")
+            write_status("stopped by user", current_prompt, run_number)
+            restore_terminal()
+            return
+
+        run_number += 1
+        write_status("running", current_prompt, run_number)
+
+        log("")
+        log("==========================================")
+        log(f"[SESSION] Run #{run_number} ({datetime.now().strftime('%H:%M:%S')})")
+        log("==========================================")
+
+        # Capture HEAD commit before run for summary
+        def run_git(*args):
+            try:
+                return subprocess.check_output(
+                    ["git"] + list(args), stderr=subprocess.DEVNULL, text=True
+                ).strip()
+            except Exception:
+                return ""
+        before_commit = run_git("rev-parse", "HEAD")
+
+        ret_code, output = run_claude(current_prompt, current_continue)
+
+        # Check for rate limit
+        log("[CHECK] Checking for rate limit in output...")
+        rate_match = check_rate_limit(output)
+        if rate_match:
+            log(f"[RATE LIMIT] Detected rate limit message: {rate_match.group(0)}")
+            resume_ts = parse_rate_limit_time(rate_match)
+            if resume_ts:
+                log(f"[RATE LIMIT] Parsed reset timestamp: {resume_ts} ({datetime.fromtimestamp(resume_ts).strftime('%Y-%m-%d %H:%M:%S')})")
+                write_status("waiting for rate limit", current_prompt, run_number)
+                wait_for_reset(resume_ts)
+                run_number -= 1  # Retry same prompt
+                log(f"[SESSION] Retrying run #{run_number + 1} after rate limit reset...")
+                continue
+            else:
+                log("[ERROR] Failed to parse rate limit reset time!")
+        else:
+            log("[CHECK] No rate limit detected.")
+
+        if ret_code != 0:
+            log("")
+            log(f"[ERROR] Claude CLI failed on run #{run_number} with exit code: {ret_code}")
+            log(f"[ERROR] This usually means Claude encountered an error.")
+            log(f"[ERROR] Check the output above for details.")
+            write_status("failed", current_prompt, run_number)
+            sys.exit(1)
+
+        # Log summary of what was done
+        log("")
+        log(f"[SESSION] Run #{run_number} completed successfully at {datetime.now().strftime('%H:%M:%S')}")
+        if before_commit:
+            log_run_summary(run_number, before_commit)
+        else:
+            log("[SESSION] No git changes detected in this run.")
+
+        # Keep using the initial prompt for all runs (no auto-switch to "continue")
+        # current_prompt stays as the original prompt
+        # current_continue stays as the original flag
+
+        log("")
+        log(f"[SESSION] ✓ Run #{run_number} completed. Starting next run in 5 seconds...")
+        log(f"[SESSION] (Press Ctrl+C or run './claude-auto-resume --stop' to stop)")
+
+        for _ in range(5):
+            if check_stop_requested():
+                log(f"[SESSION] Stopped by user (via --stop) at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                log(f"[SESSION] Completed {run_number} run(s).")
+                write_status("stopped by user", current_prompt, run_number)
+                return
+            time.sleep(1)
+
+    log(f"[SESSION] Reached maximum of {MAX_RUNS} runs.")
+    write_status("completed (max runs)", current_prompt, run_number)
+    restore_terminal()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Run Claude CLI in a loop with auto-resume on rate limits.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  ./claude-auto-resume "implement feature"         # run in background (default)
+  ./claude-auto-resume --fg "implement feature"    # run in foreground
+  ./claude-auto-resume --status                    # check on running session
+  ./claude-auto-resume --stop                      # stop gracefully
+  ./claude-auto-resume --force-stop                # force kill all processes
+  tail -f .claude-auto-resume/session.log          # follow live output
+
+Warning: Uses --dangerously-skip-permissions. Use only in trusted environments.
+""",
+    )
+    parser.add_argument("prompt", nargs="?", default="continue", help="Prompt for Claude")
+    parser.add_argument("-c", "--continue", dest="continue_flag", action="store_true", help="Continue previous conversation")
+    parser.add_argument("--fg", action="store_true", help="Run in foreground (default: background)")
+    parser.add_argument("--status", action="store_true", help="Show session status")
+    parser.add_argument("--stop", action="store_true", help="Stop running session gracefully")
+    parser.add_argument("--force-stop", "--kill", action="store_true", help="Force stop by killing all processes immediately")
+    parser.add_argument("-v", "--version", action="version", version=f"claude-auto-resume v{VERSION}")
+
+    args = parser.parse_args()
+
+    if args.status:
+        cmd_status(args)
+    elif args.force_stop:
+        cmd_force_stop(args)
+    elif args.stop:
+        cmd_stop(args)
+    else:
+        cmd_run(args)
+
+
+if __name__ == "__main__":
+    main()
