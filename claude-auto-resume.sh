@@ -91,6 +91,32 @@ cleanup_resources() {
 trap cleanup_on_exit EXIT
 trap interrupt_handler INT TERM
 
+# Cross-platform timeout wrapper (GNU timeout not available on macOS)
+portable_timeout() {
+    local seconds="${1%s}"  # Strip trailing 's' if present
+    shift
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$seconds" "$@"
+    elif command -v gtimeout >/dev/null 2>&1; then
+        gtimeout "$seconds" "$@"
+    else
+        # macOS/BSD fallback: run command in background with watchdog
+        "$@" &
+        local pid=$!
+        ( sleep "$seconds" && kill "$pid" 2>/dev/null ) &
+        local watcher=$!
+        wait "$pid" 2>/dev/null
+        local ret=$?
+        kill "$watcher" 2>/dev/null
+        wait "$watcher" 2>/dev/null 2>&1
+        # Killed by signal means timeout occurred
+        if [ $ret -ge 128 ]; then
+            return 124
+        fi
+        return $ret
+    fi
+}
+
 # Function to execute custom commands with proper error handling
 execute_custom_command() {
     local command="$1"
@@ -152,26 +178,30 @@ parse_limit_message() {
         echo "$resume_timestamp"
         return
     fi
-    
+
     # Check for new format: X-hour limit reached ∙ resets Xam/pm or X:XXam/pm
-    if echo "$claude_output" | grep -q "limit reached.*resets"; then
+    # Also handles: You've hit your limit · resets 2am (Europe/Paris)
+    if echo "$claude_output" | grep -q -E "(limit reached|hit your limit).*resets"; then
         local reset_time reset_hour reset_minute reset_period reset_hour_24
-        local now_timestamp today_reset
-        
+        local now_timestamp today_reset output_tz=""
+
         # Extract the reset time (e.g., "3am", "12:30am")
         reset_time=$(echo "$claude_output" | grep -o "resets [0-9]*:*[0-9]*[ap]m" | awk '{print $2}')
         if [ -z "$reset_time" ]; then
             echo "[ERROR] Failed to extract reset time from new Claude output format."
-            echo "[HINT] Expected format: 'X-hour limit reached ∙ resets Xam/pm' or 'X-hour limit reached ∙ resets X:XXam/pm'"
+            echo "[HINT] Expected format: 'X-hour limit reached ∙ resets Xam/pm' or 'You've hit your limit · resets X:XXam/pm (TZ)'"
             echo "[SUGGESTION] Check if Claude CLI output format has changed."
             echo "[DEBUG] Raw output: $claude_output"
             exit 2
         fi
-        
+
+        # Extract timezone if present, e.g., "(Europe/Paris)" -> "Europe/Paris"
+        output_tz=$(echo "$claude_output" | grep -o "resets [0-9]*:*[0-9]*[ap]m ([^)]*)" | grep -o '([^)]*)' | tr -d '()')
+
         # Convert reset time to timestamp
         # Extract hour, minute (if present), and am/pm
         reset_period=$(echo "$reset_time" | grep -o '[ap]m')
-        
+
         # Check if time includes minutes (e.g., "12:30am")
         if echo "$reset_time" | grep -q ":"; then
             reset_hour=$(echo "$reset_time" | cut -d: -f1)
@@ -181,7 +211,7 @@ parse_limit_message() {
             reset_hour=$(echo "$reset_time" | sed 's/[ap]m//')
             reset_minute=0
         fi
-        
+
         # Convert to 24-hour format
         if [ "$reset_period" = "am" ]; then
             if [ "$reset_hour" = "12" ]; then
@@ -196,42 +226,60 @@ parse_limit_message() {
                 reset_hour_24=$((reset_hour + 12))
             fi
         fi
-        
+
         # Get current time and calculate next reset time
         now_timestamp=$(date +%s)
-        
-        # Get today's reset time
+
+        # Get today's reset time (in the correct timezone if specified)
         if date --version >/dev/null 2>&1; then
             # GNU date (Linux)
-            today_reset=$(date -d "today ${reset_hour_24}:${reset_minute}:00" +%s)
+            if [ -n "$output_tz" ]; then
+                today_reset=$(TZ="$output_tz" date -d "today ${reset_hour_24}:${reset_minute}:00" +%s)
+            else
+                today_reset=$(date -d "today ${reset_hour_24}:${reset_minute}:00" +%s)
+            fi
         else
             # BSD date (macOS)
-            today_reset=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date +%Y-%m-%d) ${reset_hour_24}:${reset_minute}:00" +%s)
+            if [ -n "$output_tz" ]; then
+                today_reset=$(TZ="$output_tz" date -j -f "%Y-%m-%d %H:%M:%S" "$(TZ="$output_tz" date +%Y-%m-%d) ${reset_hour_24}:${reset_minute}:00" +%s)
+            else
+                today_reset=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date +%Y-%m-%d) ${reset_hour_24}:${reset_minute}:00" +%s)
+            fi
         fi
-        
+
         # If reset time has passed today, use tomorrow's reset time
         if [ $now_timestamp -gt $today_reset ]; then
             if date --version >/dev/null 2>&1; then
                 # GNU date (Linux)
-                resume_timestamp=$(date -d "tomorrow ${reset_hour_24}:${reset_minute}:00" +%s)
+                if [ -n "$output_tz" ]; then
+                    resume_timestamp=$(TZ="$output_tz" date -d "tomorrow ${reset_hour_24}:${reset_minute}:00" +%s)
+                else
+                    resume_timestamp=$(date -d "tomorrow ${reset_hour_24}:${reset_minute}:00" +%s)
+                fi
             else
                 # BSD date (macOS)
-                local tomorrow=$(date -j -v+1d +%Y-%m-%d)
-                resume_timestamp=$(date -j -f "%Y-%m-%d %H:%M:%S" "${tomorrow} ${reset_hour_24}:${reset_minute}:00" +%s)
+                if [ -n "$output_tz" ]; then
+                    local tomorrow=$(TZ="$output_tz" date -j -v+1d +%Y-%m-%d)
+                    resume_timestamp=$(TZ="$output_tz" date -j -f "%Y-%m-%d %H:%M:%S" "${tomorrow} ${reset_hour_24}:${reset_minute}:00" +%s)
+                else
+                    local tomorrow=$(date -j -v+1d +%Y-%m-%d)
+                    resume_timestamp=$(date -j -f "%Y-%m-%d %H:%M:%S" "${tomorrow} ${reset_hour_24}:${reset_minute}:00" +%s)
+                fi
             fi
         else
             resume_timestamp=$today_reset
         fi
-        
+
         echo "$resume_timestamp"
         return
     fi
-    
+
     # If no recognized format found
     echo "[ERROR] Unrecognized Claude usage limit message format."
     echo "[HINT] Expected formats:"
     echo "  - 'Claude AI usage limit reached|<timestamp>'"
-    echo "  - 'X-hour limit reached ∙ resets Xam/pm'"
+    echo "  - 'X-hour limit reached ∙ resets Xam/pm' or 'X:XXam/pm'"
+    echo "  - 'You've hit your limit · resets Xam/pm (Timezone)'"
     echo "[SUGGESTION] Check if Claude CLI output format has changed."
     echo "[DEBUG] Raw output: $claude_output"
     exit 2
@@ -486,7 +534,7 @@ if [ "$EXECUTE_MODE" = true ]; then
     # but skip if Claude CLI is not available
     if command -v claude &> /dev/null; then
         CLAUDE_PID=""
-        CLAUDE_OUTPUT=$(timeout 300s claude -p 'check' 2>&1)
+        CLAUDE_OUTPUT=$(portable_timeout 300 claude -p 'check' 2>&1)
         RET_CODE=$?
         CLAUDE_PID=""
     else
@@ -498,7 +546,7 @@ else
     echo "Executing Claude CLI command..."
     echo "[INFO] This check may take 1-2 minutes depending on network conditions..."
     CLAUDE_PID=""
-    CLAUDE_OUTPUT=$(timeout 300s claude -p 'check' 2>&1)
+    CLAUDE_OUTPUT=$(portable_timeout 300 claude -p 'check' 2>&1)
     RET_CODE=$?
     CLAUDE_PID=""
 fi
@@ -530,7 +578,7 @@ fi
 # Old format: Claude AI usage limit reached|<timestamp>
 # New format: 5-hour limit reached ∙ resets 3am
 # Newest format: You've hit your limit · resets 2am (Europe/Paris)
-LIMIT_MSG=$(echo "$CLAUDE_OUTPUT" | grep -E "(hit your limit.*resets)")
+LIMIT_MSG=$(echo "$CLAUDE_OUTPUT" | grep -E "(Claude AI usage limit reached|limit reached.*resets|hit your limit.*resets)")
 
 # Test mode: simulate usage limit
 if [ "$TEST_MODE" = true ]; then
