@@ -90,6 +90,32 @@ cleanup_resources() {
 trap cleanup_on_exit EXIT
 trap interrupt_handler INT TERM
 
+# Cross-platform timeout wrapper (GNU timeout not available on macOS)
+portable_timeout() {
+    local seconds="${1%s}"  # Strip trailing 's' if present
+    shift
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$seconds" "$@"
+    elif command -v gtimeout >/dev/null 2>&1; then
+        gtimeout "$seconds" "$@"
+    else
+        # macOS/BSD fallback: run command in background with watchdog
+        "$@" &
+        local pid=$!
+        ( sleep "$seconds" && kill "$pid" 2>/dev/null ) &
+        local watcher=$!
+        wait "$pid" 2>/dev/null
+        local ret=$?
+        kill "$watcher" 2>/dev/null
+        wait "$watcher" 2>/dev/null 2>&1
+        # Killed by signal means timeout occurred
+        if [ $ret -ge 128 ]; then
+            return 124
+        fi
+        return $ret
+    fi
+}
+
 # Function to execute custom commands with proper error handling
 execute_custom_command() {
     local command="$1"
@@ -151,11 +177,13 @@ extract_old_format_timestamp() {
 }
 
 # Function to extract timestamp from new format: X-hour limit reached ∙ resets Xam/pm
+# Also handles newest format: You've hit your limit · resets 2am (Europe/Paris)
 extract_new_format_timestamp() {
     local claude_output="$1"
     local reset_time reset_hour reset_period reset_hour_24
     local now_timestamp today_reset resume_timestamp
-    
+    local output_tz=""
+
     # Extract the reset time (e.g., "3am")
     reset_time=$(echo "$claude_output" | grep -o "resets [0-9]*[ap]m" | awk '{print $2}')
     if [ -z "$reset_time" ]; then
@@ -165,12 +193,15 @@ extract_new_format_timestamp() {
         echo "[DEBUG] Raw output: $claude_output"
         exit 2
     fi
-    
+
+    # Extract timezone if present, e.g., "(Europe/Paris)" -> "Europe/Paris"
+    output_tz=$(echo "$claude_output" | grep -o "resets [0-9]*[ap]m ([^)]*)" | grep -o '([^)]*)' | tr -d '()')
+
     # Convert reset time to timestamp
     # Extract hour and am/pm
     reset_hour=$(echo "$reset_time" | sed 's/[ap]m//')
     reset_period=$(echo "$reset_time" | grep -o '[ap]m')
-    
+
     # Convert to 24-hour format
     if [ "$reset_period" = "am" ]; then
         if [ "$reset_hour" = "12" ]; then
@@ -185,33 +216,51 @@ extract_new_format_timestamp() {
             reset_hour_24=$((reset_hour + 12))
         fi
     fi
-    
+
     # Get current time and calculate next reset time
+    # If a timezone was specified in the output, use it for date calculations
     now_timestamp=$(date +%s)
-    
-    # Get today's reset time
+
+    # Get today's reset time (in the correct timezone if specified)
     if date --version >/dev/null 2>&1; then
         # GNU date (Linux)
-        today_reset=$(date -d "today ${reset_hour_24}:00:00" +%s)
+        if [ -n "$output_tz" ]; then
+            today_reset=$(TZ="$output_tz" date -d "today ${reset_hour_24}:00:00" +%s)
+        else
+            today_reset=$(date -d "today ${reset_hour_24}:00:00" +%s)
+        fi
     else
         # BSD date (macOS)
-        today_reset=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date +%Y-%m-%d) ${reset_hour_24}:00:00" +%s)
+        if [ -n "$output_tz" ]; then
+            today_reset=$(TZ="$output_tz" date -j -f "%Y-%m-%d %H:%M:%S" "$(TZ="$output_tz" date +%Y-%m-%d) ${reset_hour_24}:00:00" +%s)
+        else
+            today_reset=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date +%Y-%m-%d) ${reset_hour_24}:00:00" +%s)
+        fi
     fi
-    
+
     # If reset time has passed today, use tomorrow's reset time
     if [ $now_timestamp -gt $today_reset ]; then
         if date --version >/dev/null 2>&1; then
             # GNU date (Linux)
-            resume_timestamp=$(date -d "tomorrow ${reset_hour_24}:00:00" +%s)
+            if [ -n "$output_tz" ]; then
+                resume_timestamp=$(TZ="$output_tz" date -d "tomorrow ${reset_hour_24}:00:00" +%s)
+            else
+                resume_timestamp=$(date -d "tomorrow ${reset_hour_24}:00:00" +%s)
+            fi
         else
             # BSD date (macOS)
-            local tomorrow=$(date -j -v+1d +%Y-%m-%d)
-            resume_timestamp=$(date -j -f "%Y-%m-%d %H:%M:%S" "${tomorrow} ${reset_hour_24}:00:00" +%s)
+            if [ -n "$output_tz" ]; then
+                local tomorrow=$(TZ="$output_tz" date -j -v+1d +%Y-%m-%d)
+                resume_timestamp=$(TZ="$output_tz" date -j -f "%Y-%m-%d %H:%M:%S" "${tomorrow} ${reset_hour_24}:00:00" +%s)
+            else
+                local tomorrow=$(date -j -v+1d +%Y-%m-%d)
+                resume_timestamp=$(date -j -f "%Y-%m-%d %H:%M:%S" "${tomorrow} ${reset_hour_24}:00:00" +%s)
+            fi
         fi
     else
         resume_timestamp=$today_reset
     fi
-    
+
     echo "$resume_timestamp"
 }
 
@@ -458,7 +507,7 @@ if [ "$EXECUTE_MODE" = true ]; then
     # but skip if Claude CLI is not available
     if command -v claude &> /dev/null; then
         CLAUDE_PID=""
-        CLAUDE_OUTPUT=$(timeout 300s claude -p 'check' 2>&1)
+        CLAUDE_OUTPUT=$(portable_timeout 300 claude -p 'check' 2>&1)
         RET_CODE=$?
         CLAUDE_PID=""
     else
@@ -470,7 +519,7 @@ else
     echo "Executing Claude CLI command..."
     echo "[INFO] This check may take 1-2 minutes depending on network conditions..."
     CLAUDE_PID=""
-    CLAUDE_OUTPUT=$(timeout 300s claude -p 'check' 2>&1)
+    CLAUDE_OUTPUT=$(portable_timeout 300 claude -p 'check' 2>&1)
     RET_CODE=$?
     CLAUDE_PID=""
 fi
@@ -502,7 +551,7 @@ fi
 # Old format: Claude AI usage limit reached|<timestamp>
 # New format: 5-hour limit reached ∙ resets 3am
 # Newest format: You've hit your limit · resets 2am (Europe/Paris)
-LIMIT_MSG=$(echo "$CLAUDE_OUTPUT" | grep -E "(hit your limit.*resets)")
+LIMIT_MSG=$(echo "$CLAUDE_OUTPUT" | grep -E "(Claude AI usage limit reached|limit reached.*resets|hit your limit.*resets)")
 
 # Test mode: simulate usage limit
 if [ "$TEST_MODE" = true ]; then
