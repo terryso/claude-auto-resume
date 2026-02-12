@@ -264,6 +264,25 @@ validate_claude_cli() {
     fi
 }
 
+# Helper: run `claude -p 'check'` safely — prefer `timeout --foreground`, fall back to `script` (pty)
+run_claude_check() {
+    # Preferred: timeout with --foreground prevents background-stop (SIGTTOU) when used
+    if timeout --help 2>&1 | grep -q -- '--foreground'; then
+        timeout --foreground 300s claude -p 'check' 2>&1
+        return $?
+    fi
+
+    # Fallback: provide a pty so CLI won't perform terminal IO and get stopped
+    if command -v script >/dev/null 2>&1; then
+        script -q -c "claude -p 'check'" /dev/null 2>&1
+        return $?
+    fi
+
+    # Last resort: plain timeout (may misbehave in rare shells)
+    timeout 300s claude -p 'check' 2>&1
+    return $?
+}
+
 # Function to show help
 show_help() {
     cat << EOF
@@ -458,7 +477,7 @@ if [ "$EXECUTE_MODE" = true ]; then
     # but skip if Claude CLI is not available
     if command -v claude &> /dev/null; then
         CLAUDE_PID=""
-        CLAUDE_OUTPUT=$(timeout 300s claude -p 'check' 2>&1)
+        CLAUDE_OUTPUT=$(run_claude_check)
         RET_CODE=$?
         CLAUDE_PID=""
     else
@@ -470,7 +489,7 @@ else
     echo "Executing Claude CLI command..."
     echo "[INFO] This check may take 1-2 minutes depending on network conditions..."
     CLAUDE_PID=""
-    CLAUDE_OUTPUT=$(timeout 300s claude -p 'check' 2>&1)
+    CLAUDE_OUTPUT=$(run_claude_check)
     RET_CODE=$?
     CLAUDE_PID=""
 fi
@@ -484,7 +503,7 @@ if [ $RET_CODE -eq 124 ]; then
         echo "[ERROR] Claude CLI operation timed out after 300 seconds."
         echo "[HINT] This may indicate network issues or Claude service problems."
         echo "[SUGGESTION] Try again in a few minutes, or check Claude service status."
-        echo "[DEBUG] Command executed: timeout 300s claude -p 'check'"
+        echo "[DEBUG] Command executed: claude -p 'check' (wrapped by timeout --foreground or script fallback)"
         exit 3
     fi
 fi
