@@ -4,7 +4,7 @@
 # Depends only on standard shell commands and claude CLI
 
 # Version information
-VERSION="1.5.0"
+VERSION="1.5.1"
 
 # Default prompt to use when resuming
 DEFAULT_PROMPT="continue"
@@ -153,16 +153,16 @@ parse_limit_message() {
         return
     fi
     
-    # Check for new format: X-hour limit reached ∙ resets Xam/pm or X:XXam/pm
-    if echo "$claude_output" | grep -q "limit reached.*resets"; then
+    # Check for new format: X-hour limit reached OR hit your limit ∙ resets Xam/pm
+    if echo "$claude_output" | grep -qE "(limit reached|hit your limit).*resets"; then
         local reset_time reset_hour reset_minute reset_period reset_hour_24
         local now_timestamp today_reset
         
-        # Extract the reset time (e.g., "3am", "12:30am")
-        reset_time=$(echo "$claude_output" | grep -o "resets [0-9]*:*[0-9]*[ap]m" | awk '{print $2}')
+        # Extract the reset time (e.g., "3am", "12:30am"), ignoring any trailing timezone info
+        reset_time=$(echo "$claude_output" | grep -oE "[0-9]+(:[0-9]+)?[ap]m" | head -n 1)
         if [ -z "$reset_time" ]; then
             echo "[ERROR] Failed to extract reset time from new Claude output format."
-            echo "[HINT] Expected format: 'X-hour limit reached ∙ resets Xam/pm' or 'X-hour limit reached ∙ resets X:XXam/pm'"
+            echo "[HINT] Expected format: '...limit... resets Xam/pm' or '...limit... resets X:XXam/pm'"
             echo "[SUGGESTION] Check if Claude CLI output format has changed."
             echo "[DEBUG] Raw output: $claude_output"
             exit 2
@@ -170,7 +170,7 @@ parse_limit_message() {
         
         # Convert reset time to timestamp
         # Extract hour, minute (if present), and am/pm
-        reset_period=$(echo "$reset_time" | grep -o '[ap]m')
+        reset_period=$(echo "$reset_time" | grep -oE "[ap]m")
         
         # Check if time includes minutes (e.g., "12:30am")
         if echo "$reset_time" | grep -q ":"; then
@@ -232,6 +232,7 @@ parse_limit_message() {
     echo "[HINT] Expected formats:"
     echo "  - 'Claude AI usage limit reached|<timestamp>'"
     echo "  - 'X-hour limit reached ∙ resets Xam/pm'"
+    echo "  - 'You've hit your limit · resets Xam/pm'"
     echo "[SUGGESTION] Check if Claude CLI output format has changed."
     echo "[DEBUG] Raw output: $claude_output"
     exit 2
@@ -530,7 +531,7 @@ fi
 # Old format: Claude AI usage limit reached|<timestamp>
 # New format: 5-hour limit reached ∙ resets 3am
 # Newest format: You've hit your limit · resets 2am (Europe/Paris)
-LIMIT_MSG=$(echo "$CLAUDE_OUTPUT" | grep -E "(hit your limit.*resets)")
+LIMIT_MSG=$(echo "$CLAUDE_OUTPUT" | grep -E "(hit your limit|limit reached).*resets")
 
 # Test mode: simulate usage limit
 if [ "$TEST_MODE" = true ]; then
