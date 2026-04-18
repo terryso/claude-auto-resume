@@ -153,16 +153,20 @@ parse_limit_message() {
         return
     fi
     
-    # Check for new format: X-hour limit reached ∙ resets Xam/pm or X:XXam/pm
-    if echo "$claude_output" | grep -q "limit reached.*resets"; then
+    # Consolidated handler for new formats:
+    # - "X-hour limit reached ∙ resets Xam/pm"
+    # - "You've hit your limit · resets Xam/pm (Europe/Brussels)"
+    # Both use the same reset time extraction pattern
+    if echo "$claude_output" | grep -q -E "(limit reached|hit your limit).*resets"; then
         local reset_time reset_hour reset_minute reset_period reset_hour_24
         local now_timestamp today_reset
         
         # Extract the reset time (e.g., "3am", "12:30am")
+        # This regex works for both format variations
         reset_time=$(echo "$claude_output" | grep -o "resets [0-9]*:*[0-9]*[ap]m" | awk '{print $2}')
         if [ -z "$reset_time" ]; then
-            echo "[ERROR] Failed to extract reset time from new Claude output format."
-            echo "[HINT] Expected format: 'X-hour limit reached ∙ resets Xam/pm' or 'X-hour limit reached ∙ resets X:XXam/pm'"
+            echo "[ERROR] Failed to extract reset time from Claude output format."
+            echo "[HINT] Expected format: 'limit reached ∙ resets Xam/pm' or 'hit your limit · resets Xam/pm (Timezone)'"
             echo "[SUGGESTION] Check if Claude CLI output format has changed."
             echo "[DEBUG] Raw output: $claude_output"
             exit 2
@@ -231,7 +235,7 @@ parse_limit_message() {
     echo "[ERROR] Unrecognized Claude usage limit message format."
     echo "[HINT] Expected formats:"
     echo "  - 'Claude AI usage limit reached|<timestamp>'"
-    echo "  - 'X-hour limit reached ∙ resets Xam/pm'"
+    echo "  - 'X-hour limit reached ∙ resets Xam/pm' or 'You've hit your limit · resets Xam/pm (Timezone)'"
     echo "[SUGGESTION] Check if Claude CLI output format has changed."
     echo "[DEBUG] Raw output: $claude_output"
     exit 2
