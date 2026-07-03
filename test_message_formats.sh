@@ -37,7 +37,7 @@ run_test() {
     fi
 }
 
-# Test extract_old_format_timestamp function
+# Test parse_limit_message with old timestamp format
 test_old_format() {
     echo -e "${YELLOW}Testing old format timestamp extraction...${NC}"
     
@@ -47,12 +47,12 @@ test_old_format() {
     # Test cases for old format
     test_output="Claude AI usage limit reached|1735776000"
     expected_timestamp="1735776000"
-    actual_timestamp=$(extract_old_format_timestamp "$test_output")
+    actual_timestamp=$(parse_limit_message "$test_output")
     run_test "old format extraction" "$expected_timestamp" "$actual_timestamp"
     
     # Test error case
     test_output="Claude AI usage limit reached|invalid"
-    if extract_old_format_timestamp "$test_output" 2>/dev/null; then
+    if ( parse_limit_message "$test_output" >/dev/null 2>&1 ); then
         echo -e "${RED}FAIL${NC}: Should have failed with invalid timestamp"
     else
         echo -e "${GREEN}PASS${NC}: Correctly failed with invalid timestamp"
@@ -61,7 +61,7 @@ test_old_format() {
     TESTS_RUN=$((TESTS_RUN + 1))
 }
 
-# Test extract_new_format_timestamp function
+# Test parse_limit_message with reset-time formats
 test_new_format() {
     echo -e "${YELLOW}Testing new format timestamp extraction...${NC}"
     
@@ -76,11 +76,14 @@ test_new_format() {
         "5-hour limit reached ∙ resets 11:45pm"
         "5-hour limit reached ∙ resets 12pm"
         "5-hour limit reached ∙ resets 6:15am"
+        "You've hit your limit · resets 4:20am (Europe/Warsaw)"
+        "You've hit your session limit · resets 4:20am (Europe/Warsaw)"
+        "You've hit your session limit · resets 2am (Europe/Paris)"
     )
     
     for test_case in "${test_cases[@]}"; do
         echo "  Testing: $test_case"
-        if timestamp=$(extract_new_format_timestamp "$test_case" 2>/dev/null); then
+        if timestamp=$(parse_limit_message "$test_case" 2>/dev/null); then
             # Verify timestamp is reasonable (within next 24 hours)
             if [ "$timestamp" -gt "$current_time" ] && [ "$timestamp" -lt $((current_time + 86400)) ]; then
                 echo -e "    ${GREEN}PASS${NC}: Generated valid future timestamp"
@@ -96,7 +99,7 @@ test_new_format() {
     
     # Test error case
     test_output="5-hour limit reached ∙ resets invalid"
-    if extract_new_format_timestamp "$test_output" 2>/dev/null; then
+    if ( parse_limit_message "$test_output" >/dev/null 2>&1 ); then
         echo -e "${RED}FAIL${NC}: Should have failed with invalid time format"
     else
         echo -e "${GREEN}PASS${NC}: Correctly failed with invalid time format"
@@ -118,10 +121,13 @@ test_message_detection() {
         "5-hour limit reached ∙ resets 3am"
         "5-hour limit reached ∙ resets 12:30am"
         "Some text 5-hour limit reached ∙ resets 11:45pm more text"
+        "You've hit your limit · resets 4:20am (Europe/Warsaw)"
+        "You've hit your session limit · resets 4:20am (Europe/Warsaw)"
+        "You've hit your session limit · resets 2am (Europe/Paris)"
     )
     
     for msg in "${old_messages[@]}"; do
-        if echo "$msg" | grep -qE "(Claude AI usage limit reached|limit reached.*resets)"; then
+        if detect_limit_message "$msg" >/dev/null; then
             echo -e "  ${GREEN}PASS${NC}: Detected old format message"
             TESTS_PASSED=$((TESTS_PASSED + 1))
         else
@@ -131,7 +137,7 @@ test_message_detection() {
     done
     
     for msg in "${new_messages[@]}"; do
-        if echo "$msg" | grep -qE "(Claude AI usage limit reached|limit reached.*resets)"; then
+        if detect_limit_message "$msg" >/dev/null; then
             echo -e "  ${GREEN}PASS${NC}: Detected new format message"
             TESTS_PASSED=$((TESTS_PASSED + 1))
         else
@@ -139,6 +145,50 @@ test_message_detection() {
         fi
         TESTS_RUN=$((TESTS_RUN + 1))
     done
+
+    local unrelated_messages=(
+        "Error: authentication failed"
+        "You've hit your context limit. Try a shorter prompt."
+    )
+
+    for msg in "${unrelated_messages[@]}"; do
+        if detect_limit_message "$msg" >/dev/null; then
+            echo -e "  ${RED}FAIL${NC}: Incorrectly detected unrelated message: $msg"
+        else
+            echo -e "  ${GREEN}PASS${NC}: Ignored unrelated message"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        fi
+        TESTS_RUN=$((TESTS_RUN + 1))
+    done
+}
+
+run_script_with_mock_claude() {
+    local mock_dir
+    mock_dir=$(mktemp -d)
+
+    cat > "${mock_dir}/claude" <<'EOF'
+#!/bin/bash
+
+if [[ "$*" == *"--help"* ]]; then
+    echo "Usage: claude [options]"
+    echo "  --dangerously-skip-permissions"
+    exit 0
+fi
+
+if [[ "$*" == *"check"* ]]; then
+    echo "No usage limit detected"
+    exit 0
+fi
+
+echo "Mock Claude resume completed"
+exit 0
+EOF
+
+    chmod +x "${mock_dir}/claude"
+    PATH="${mock_dir}:$PATH" timeout 15s "$SCRIPT_PATH" "$@" >/dev/null 2>&1
+    local status=$?
+    rm -rf "$mock_dir"
+    return $status
 }
 
 # Test script integration
@@ -147,7 +197,7 @@ test_script_integration() {
     
     # Test old format in test mode
     echo "  Testing old format test mode..."
-    if timeout 15s "$SCRIPT_PATH" --test-mode 2 "test" >/dev/null 2>&1; then
+    if run_script_with_mock_claude --test-mode 2 "test"; then
         echo -e "  ${GREEN}PASS${NC}: Old format test mode completed"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
@@ -157,7 +207,7 @@ test_script_integration() {
     
     # Test new format in test mode
     echo "  Testing new format test mode..."
-    if timeout 15s "$SCRIPT_PATH" --test-mode 2 --test-new-format "test" >/dev/null 2>&1; then
+    if run_script_with_mock_claude --test-mode 2 --test-new-format "test"; then
         echo -e "  ${GREEN}PASS${NC}: New format test mode completed"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else

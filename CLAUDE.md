@@ -61,7 +61,7 @@ The project follows a single-file architecture:
 ### Core Logic Flow
 1. Parses command line arguments for custom prompt and session type (new vs continue)
 2. Runs `claude -p 'check'` command
-3. Parses output for usage limit messages with format: `Claude AI usage limit reached|<timestamp>`
+3. Parses output for usage limit messages such as `Claude AI usage limit reached|<timestamp>`, `5-hour limit reached ∙ resets 3am`, `You've hit your limit · resets 4:20am (Europe/Warsaw)`, and `You've hit your session limit · resets 4:20am (Europe/Warsaw)`
 4. Calculates wait time from timestamp
 5. Displays countdown timer and waits
 6. Automatically runs either:

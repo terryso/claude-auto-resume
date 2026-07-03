@@ -169,7 +169,11 @@ chmod +x claude-auto-resume.sh
 ## How It Works
 
 1. **Detect Limits**: Execute `claude -p 'check'` command
-2. **Parse Output**: Look for `Claude AI usage limit reached|<timestamp>` format messages
+2. **Parse Output**: Look for supported usage-limit messages, including:
+   - `Claude AI usage limit reached|<timestamp>`
+   - `5-hour limit reached ∙ resets 3am`
+   - `You've hit your limit · resets 4:20am (Europe/Warsaw)`
+   - `You've hit your session limit · resets 4:20am (Europe/Warsaw)`
 3. **Calculate Wait Time**: Calculate required wait time based on timestamp
 4. **Display Countdown**: Show real-time remaining wait time
 5. **Auto Resume**: Automatically execute either:

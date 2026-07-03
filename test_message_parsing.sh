@@ -18,8 +18,11 @@ parse_limit_message() {
         return
     fi
     
-    # Check for new format: X-hour limit reached ∙ resets Xam/pm or X:XXam/pm
-    if echo "$claude_output" | grep -q "limit reached.*resets"; then
+    # Check for new formats:
+    # - X-hour limit reached ∙ resets Xam/pm or X:XXam/pm
+    # - You've hit your limit · resets Xam/pm (Timezone)
+    # - You've hit your session limit · resets Xam/pm (Timezone)
+    if echo "$claude_output" | grep -q -E "(limit reached|hit your (session )?limit).*resets"; then
         local reset_time reset_hour reset_minute reset_period reset_hour_24
         local now_timestamp today_reset
         
@@ -105,6 +108,9 @@ test_cases=(
     "5-hour limit reached ∙ resets 11:45pm"  
     "5-hour limit reached ∙ resets 12pm"
     "5-hour limit reached ∙ resets 6:15am"
+    "You've hit your limit · resets 4:20am (Europe/Warsaw)"
+    "You've hit your session limit · resets 4:20am (Europe/Warsaw)"
+    "You've hit your session limit · resets 2am (Europe/Paris)"
 )
 
 current_time=$(date +%s)
