@@ -57,7 +57,7 @@ cleanup_resources() {
     fi
     
     # Kill any background processes if they exist
-    if [ -n "$CLAUDE_PID" ]; then
+    if [ -n "${CLAUDE_PID:-}" ]; then
         echo "[INFO] Terminating Claude CLI process (PID: $CLAUDE_PID)..."
         kill $CLAUDE_PID 2>/dev/null
         # Wait a bit for graceful termination
@@ -88,8 +88,10 @@ cleanup_resources() {
 }
 
 # Set up signal handlers for graceful cleanup
-trap cleanup_on_exit EXIT
-trap interrupt_handler INT TERM
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    trap cleanup_on_exit EXIT
+    trap interrupt_handler INT TERM
+fi
 
 # Cross-platform timeout wrapper (GNU timeout not available on macOS)
 portable_timeout() {
@@ -179,9 +181,11 @@ parse_limit_message() {
         return
     fi
 
-    # Check for new format: X-hour limit reached ∙ resets Xam/pm or X:XXam/pm
-    # Also handles: You've hit your limit · resets 2am (Europe/Paris)
-    if echo "$claude_output" | grep -q -E "(limit reached|hit your limit).*resets"; then
+    # Check for new formats:
+    # - X-hour limit reached ∙ resets Xam/pm or X:XXam/pm
+    # - You've hit your limit · resets 2am (Europe/Paris)
+    # - You've hit your session limit · resets 4:20am (Europe/Warsaw)
+    if echo "$claude_output" | grep -q -E "(limit reached|hit your (session )?limit).*resets"; then
         local reset_time reset_hour reset_minute reset_period reset_hour_24
         local now_timestamp today_reset output_tz=""
 
@@ -189,7 +193,7 @@ parse_limit_message() {
         reset_time=$(echo "$claude_output" | grep -o "resets [0-9]*:*[0-9]*[ap]m" | awk '{print $2}')
         if [ -z "$reset_time" ]; then
             echo "[ERROR] Failed to extract reset time from new Claude output format."
-            echo "[HINT] Expected format: 'X-hour limit reached ∙ resets Xam/pm' or 'You've hit your limit · resets X:XXam/pm (TZ)'"
+            echo "[HINT] Expected format: 'X-hour limit reached ∙ resets Xam/pm' or 'You've hit your (session )?limit · resets X:XXam/pm (TZ)'"
             echo "[SUGGESTION] Check if Claude CLI output format has changed."
             echo "[DEBUG] Raw output: $claude_output"
             exit 2
@@ -280,9 +284,16 @@ parse_limit_message() {
     echo "  - 'Claude AI usage limit reached|<timestamp>'"
     echo "  - 'X-hour limit reached ∙ resets Xam/pm' or 'X:XXam/pm'"
     echo "  - 'You've hit your limit · resets Xam/pm (Timezone)'"
+    echo "  - 'You've hit your session limit · resets Xam/pm (Timezone)'"
     echo "[SUGGESTION] Check if Claude CLI output format has changed."
     echo "[DEBUG] Raw output: $claude_output"
     exit 2
+}
+
+detect_limit_message() {
+    local claude_output="$1"
+
+    echo "$claude_output" | grep -E "(Claude AI usage limit reached|limit reached.*resets|hit your (session )?limit.*resets)"
 }
 
 # Function to check network connectivity
@@ -366,6 +377,10 @@ EXAMPLES:
 
 EOF
 }
+
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    return 0
+fi
 
 # Parse command line arguments
 CUSTOM_PROMPT="$DEFAULT_PROMPT"
@@ -577,8 +592,9 @@ fi
 # 2. Check if usage limit is reached (support both old and new formats)
 # Old format: Claude AI usage limit reached|<timestamp>
 # New format: 5-hour limit reached ∙ resets 3am
-# Newest format: You've hit your limit · resets 2am (Europe/Paris)
-LIMIT_MSG=$(echo "$CLAUDE_OUTPUT" | grep -E "(Claude AI usage limit reached|limit reached.*resets|hit your limit.*resets)")
+# Newest formats: You've hit your limit · resets 2am (Europe/Paris)
+#                 You've hit your session limit · resets 4:20am (Europe/Warsaw)
+LIMIT_MSG=$(detect_limit_message "$CLAUDE_OUTPUT")
 
 # Test mode: simulate usage limit
 if [ "$TEST_MODE" = true ]; then

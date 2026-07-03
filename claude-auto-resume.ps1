@@ -197,17 +197,21 @@ function Extract-OldFormatTimestamp {
 function Extract-NewFormatTimestamp {
   param([string]$ClaudeOutput)
 
-  $m = [regex]::Match($ClaudeOutput, 'resets\s+(\d+)(am|pm)', 'IgnoreCase')
+  $m = [regex]::Match($ClaudeOutput, 'resets\s+(\d{1,2})(?::(\d{2}))?(am|pm)', 'IgnoreCase')
   if (-not $m.Success) {
     Write-Host "[ERROR] Failed to extract reset time from new Claude output format."
-    Write-Host "[HINT] Expected format: 'X-hour limit reached - resets Xam/pm' or 'You've hit your limit  resets Xam/pm (Zone)'"
+    Write-Host "[HINT] Expected format: 'X-hour limit reached - resets Xam/pm' or 'You've hit your (session )?limit · resets X:XXam/pm (Zone)'"
     Write-Host "[SUGGESTION] Check if Claude CLI output format has changed."
     Write-Host "[DEBUG] Raw output: $ClaudeOutput"
     exit 2
   }
 
   $hour = [int]$m.Groups[1].Value
-  $period = $m.Groups[2].Value.ToLowerInvariant()
+  $minute = 0
+  if ($m.Groups[2].Success) {
+    $minute = [int]$m.Groups[2].Value
+  }
+  $period = $m.Groups[3].Value.ToLowerInvariant()
 
   if ($period -eq 'am') {
     if ($hour -eq 12) { $hour = 0 }
@@ -216,7 +220,7 @@ function Extract-NewFormatTimestamp {
   }
 
   $now = Get-Date
-  $todayReset = $now.Date.AddHours($hour)
+  $todayReset = $now.Date.AddHours($hour).AddMinutes($minute)
   if ($now -gt $todayReset) {
     $resume = $todayReset.AddDays(1)
   } else {
@@ -398,9 +402,8 @@ try {
   }
 
   $LIMIT_MSG = ''
-  $limitPattern = '(?i)(usage limit|limit reached|hit your limit).*resets'
-  $resetPattern = '(?i)resets\s+\d+(am|pm)'
-  if ($CLAUDE_OUTPUT -match $limitPattern -or $CLAUDE_OUTPUT -match $resetPattern) {
+  $limitPattern = '(?i)(Claude AI usage limit reached\||limit reached.*resets|hit your (session )?limit.*resets)'
+  if ($CLAUDE_OUTPUT -match $limitPattern) {
     $LIMIT_MSG = $CLAUDE_OUTPUT
   }
 
@@ -512,4 +515,3 @@ try {
 finally {
   Cleanup-Resources
 }
-

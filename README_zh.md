@@ -161,7 +161,11 @@ chmod +x claude-auto-resume.sh
 ## 工作原理
 
 1. **检测限制**：执行 `claude -p 'check'` 命令
-2. **解析输出**：查找 `Claude AI usage limit reached|<timestamp>` 格式的消息
+2. **解析输出**：查找支持的使用限制消息，包括：
+   - `Claude AI usage limit reached|<timestamp>`
+   - `5-hour limit reached ∙ resets 3am`
+   - `You've hit your limit · resets 4:20am (Europe/Warsaw)`
+   - `You've hit your session limit · resets 4:20am (Europe/Warsaw)`
 3. **计算等待时间**：根据时间戳计算所需等待时间
 4. **显示倒计时**：实时显示剩余等待时间
 5. **自动恢复**：自动执行以下命令之一：
